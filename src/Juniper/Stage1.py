@@ -7,10 +7,8 @@ import matplotlib.pyplot as plt
 from scipy import signal
 from astropy.stats import sigma_clip
 
-
 from jwst.pipeline import Detector1Pipeline
 from utils import img
-
 
 def doStage1(filepath, outfile, outdir,
              group_scale={"skip":False},
@@ -23,7 +21,7 @@ def doStage1(filepath, outfile, outdir,
              jump={"skip":True},
              ramp_fit={"skip":False},
              gain_scale={"skip":False},
-             one_over_f={"skip":False, "bckg_rows":[1,2,3,4,5,6,-1,-2,-3,-4,-5,-6], "show":False}
+             one_over_f={"skip":False, "bckg_rows":[1,2,3,4,5,6,-1,-2,-3,-4,-5,-6], "sigma":1.5, "kernel":(1,15), "show":False}
              ):
     '''
     Performs Stage 1 calibration on one file.
@@ -31,14 +29,8 @@ def doStage1(filepath, outfile, outdir,
     :param filepath: str. Location of the file you want to correct. The file must be of type *_uncal.fits.
     :param outfile: str. Name to give to the calibrated file.
     :param outdir: str. Location of where to save the calibrated file to.
-    :param group_scale, dq_init, saturation, etc.: dict. These are the dictionaries shown in the Detector1Pipeline()
-                                                   documentation, which control which steps are run and what parameters
-                                                   they are run with. Please consult jwst-pipeline.readthedocs.io for
-                                                   more information on these dictionaries.
-    :param one_over_f: dict. Keyword "skip" is a bool that sets whether or not to perform this step. Keyword
-                       "bckg_rows" contains list of integers that selects which rows of the array are used as
-                       background for 1/f subtraction. Keyword "show" is a bool that sets whether the first group
-                       of the first integration is shown as it is cleaned.
+    :param group_scale, dq_init, saturation, etc.: dict. These are the dictionaries shown in the Detector1Pipeline() documentation, which control which steps are run and what parameters they are run with. Please consult jwst-pipeline.readthedocs.io for more information on these dictionaries.
+    :param one_over_f: dict. Keyword "skip" is a bool that sets whether or not to perform this step. Keyword "bckg_rows" contains list of integers that selects which rows of the array are used as background for 1/f subtraction. Keyword "sigma" sets how aggressively to clean the background region before using it for subtraction. Keyword "kernel" sets the filter shape that will be used in cleaning the background region. Keyword "show" is a bool that sets whether the first group of the first integration is shown as it is cleaned.
     :return: a Stage 1 calibrated file *_rateints.fits saved to the outdir.
     '''
     # Create the output directory if it does not yet exist.
