@@ -14,6 +14,8 @@ def doStage4(filepaths, outdir,
                              "hcut2":-1,
                              "vcut1":0,
                              "vcut2":-1},
+             mask_unstable_pixels={"skip":False,
+                                   "threshold":1.0},
              extract_light_curves={"skip":False,
                                    "wavbins":np.linspace(0.6,5.3,70),
                                    "ext_type":"box"},
@@ -31,12 +33,18 @@ def doStage4(filepaths, outdir,
     
     :param filepath: lst of str. Location of the postprocessed_*.fits files you want to extract spectra from.
     :param outdir: str. Location where you want output images and text files to be saved to.
-    :param trace_aperture: dict. Keywords are "hcut1", "hcut2", "vcut1", "vcut2", all integers
-                           denoting the rows and columns respectively that define the edges of
-                           the aperture bounding the trace.
-    :return: .txt files of curves extracted from the postprocessed_*.fits files.
+    :param trace_aperture: dict. Keywords are "hcut1", "hcut2", "vcut1", "vcut2", all integers denoting the rows and columns respectively that define the edges of the aperture bounding the trace.
+    :param mask_unstable_pixels: dict. Keywords are "skip", "threshold". Whether to mask pixels whose normalized standard deviations are higher than the threshold value.
+    :param extract_light_curves: dict. Keywords are "skip", "wavbins", "ext_type". Whether to extract light curves using the given wavelength bin edges and the specified extraction type (options are "box", "polycol", "polyrow", "smooth", "medframe").
+    :param median_normalize_curves. dict. Keyword is "skip". Whether to normalize curves by their median value.
+    :param sigma_clip_curves: dict. Keywords are "skip", "b", "clip_at". Whether to sigma-clip the light curves every b points, rejecting outliers at clip_at sigma.
+    :param fix_transit_times: dict. Keywords are "skip", "epoch". Whether to fix the transit times so that epoch becomes the 0-point.
+    :param plot_light_curves: dict. Keyword is "skip". Whether to save plots of the light curves.
+    :param save_light_curves: dict. Keyword is "skip". Whether to save .txt files of the light curves.
+    :return: .txt files of curves extracted from the postprocessed_*.fits files and images related to extraction.
     '''
-    print("Performing Stage 4 extractions of spectra from the data located at: {}".format(filepaths))
+    print("Performing Stage 4 Juniper extractions of spectra from the data located at: {}".format(filepaths))
+    t0 = time.time()
     
     # Grab the needed info from the file.
     segments, errors, segstarts, wavelengths, dqflags, times, frames_to_reject = stitch_files(filepaths)
@@ -46,6 +54,18 @@ def doStage4(filepaths, outdir,
     aperture[:,
              trace_aperture["hcut1"]:trace_aperture["hcut2"],
              trace_aperture["vcut1"]:trace_aperture["vcut2"]] = 0
+    
+    if not mask_unstable_pixels["skip"]:
+        # Mask any pixel that has standard deviation normalized greater than 1.
+        masked = 0
+        print("Masking trace pixels with time variations above the specified value...")
+        for y in range(trace_aperture["hcut1"],trace_aperture["hcut2"]):
+            for x in range(trace_aperture["vcut1"],trace_aperture["vcut2"]):
+                if np.std(segments[:,y,x]/np.median(segments[:,y,x])) > mask_unstable_pixels["threshold"]:
+                    aperture[:,y,x] = 1
+                    masked += 1
+        n_trace_pixels = (trace_aperture["hcut2"]-trace_aperture["hcut1"])*(trace_aperture["vcut2"]-trace_aperture["vcut1"])
+        print("Masked {} trace pixels out of {} for standard deviation above the threshold (fraction of {}).".format(masked, n_trace_pixels, np.round(masked/n_trace_pixels, 5)))
     
     # Should not skip extract light curves! Rest of code breaks.
     if not extract_light_curves["skip"]:
@@ -95,7 +115,7 @@ def doStage4(filepaths, outdir,
             else:
                 write_light_curve(times, lc, "slc_%.3fmu_%.3fmu" % (extract_light_curves["wavbins"][i],extract_light_curves["wavbins"][i+1]), txts_outdir)
         print("Files written.")
-    print("Stage 4 finished.")
+    print("Stage 4 calibrations completed in %.3f minutes." % ((time.time() - t0)/60))
 
 def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject, wavbins, ext_type="box"):
     '''
@@ -209,7 +229,7 @@ def get_spatial_profile(segments, ext_type="polycol"):
     '''
     Builds a spatial profile for optimal extraction.
 
-    :param segments: 3D array. Integrations x nrows x ncols of data.
+    :param segments: 3D array. Integrations x nrows x ncols of data, masked to include only the data being extracted.
     :param ext_type: str. Choices are "polycol", "polyrow", "medframe", "smooth". Type of spatial profile to build.
     If ext_type "polycol", profile is an optimum profile.
     '''
@@ -235,7 +255,7 @@ def polycol(trace, poly_order=4, threshold=3):
     Computes spatial profile fit to the trace using a polynomial of the specified order, fitting along columns.
     
     :param trace: 2D array. A frame out of the trace[y,x,t] array, form trace[y,x].
-    :param order: int. Order of polynomial to fit as the profile.
+    :param order: int. Order of polynomial to fit as the spatial profile.
     :param threshold: float. Sigma threshold at which to mask polynomial fit outliers.
     :return: P[x,y] array. An array profile to use for optimal extraction.
     '''
@@ -269,22 +289,106 @@ def polycol(trace, poly_order=4, threshold=3):
     P /= np.sum(P,axis=0) # normalize on columns
     return P
 
-def polyrow():
-    return "xnopyt"
+def polyrow(trace, poly_order=10, threshold=3):
+    '''
+    Computes spatial profile fit to the trace using a polynomial of the specified order, fitting along rows.
+    
+    :param trace: 2D array. A frame out of the trace[t,y,x] array, form trace[y,x].
+    :param order: int. Order of polynomial to fit as the dispersion profile.
+    :param threshold: float. Sigma threshold at which to mask polynomial fit outliers.
+    :return: P[x,y] array. An array profile to use for optimal extraction.
+    '''
+    # Initialize P as a list.
+    P = []
+    
+    # Iterate on columns.
+    for i in range(np.shape(trace)[1]):
+        col = deepcopy(trace[:,i])
+        j = 0
+        while True:
+            p_coeff = np.polyfit(range(np.shape(col)[0]),col,deg=poly_order)
+            p_col = np.polyval(p_coeff, range(np.shape(col)[0]))
 
-def medframe():
-    return "xnopyt"
+            res = np.array(col-p_col)
+            dev = np.abs(res)/np.std(res)
+            max_dev_idx = np.argmax(dev)
 
-def smooth():
-    return "xnopyt"
+            j += 1
+            if (dev[max_dev_idx] > threshold and j < 20):
+                try:
+                    col[max_dev_idx] = (col[max_dev_idx-1]+col[max_dev_idx+1])/2
+                except IndexError:
+                    col[max_dev_idx] = np.median(p_col)
+                continue
+            else:
+                break
+        P.append(p_col)
+    P = np.array(P).T
+    P[P < 0] = 0 # enforce positivity
+    P /= np.sum(P,axis=0) # normalize on columns
+    return P
 
-### Note to developers: we're going to install some of the other optimal extraction routines here, e.g. median frame, polynomial row-wise fitting, smoothed frame.
-### The above are just placeholders for the real functions. If you haven't seen the "xnopyt" meme, I highly recommend it.
+def medframe(trace):
+    median_frame = np.median(trace, axis=0)
+    median_frame[median_frame < 0] = 0
+    median_frame = median_frame/np.sum(median_frame, axis=0)
+    return median_frame
+
+def smooth(trace, threshold=3, window_len=21):
+    '''
+    Median-filters every row in the frame following the Eureka! implementation, enforces positivity, and normalizes to get a profile for extraction.
+    
+    :param trace: 2D array. A frame out of the trace[t,y,x] array, form trace[y,x].
+    :param threshold: float. Sigma threshold at which to mask smooth fit outliers.
+    :param window_len: int. Length in pixels of the window used for smoothing the rows.
+    :return: P 2D array. An array P[y,x] for optimal extraction.
+    '''
+    # Initialize P as empty list.
+    P = []
+    
+    # Iterate on rows.
+    for i in range(np.shape(trace)[0]):
+        j = 0
+        row = deepcopy(trace[i])
+        for ind in range(np.shape(row)[0]):
+            row[ind] /= np.median(row[np.max(0,ind-10):ind+11])
+        while True:
+            x = deepcopy(row)
+                
+            # Smooth row.
+            s = np.r_[2*np.median(x[0:window_len//5])-x[window_len:1:-1], x,
+                      2*np.median(x[-window_len//5:])-x[-1:window_len:-1]]
+            
+            w = np.hanning(window_len)
+            
+            p_row = np.convolve(w/w.sum(),s,mode='same')
+            p_row = p_row[window_len-1:window_len+1]
+
+            res = np.array(row-p_row)
+            dev = np.abs(res)/np.std(res)
+            max_dev_idx = np.argmax(dev)
+            
+            j += 1
+            if (dev[max_dev_idx] > threshold and j < 20):
+                try:
+                    row[max_dev_idx] = (row[max_dev_idx-1]+row[max_dev_idx+1])/2
+                except IndexError:
+                    row[max_dev_idx] = np.median(p_row)
+                continue
+            else:
+                break
+        P.append(p_row)
+    P = np.array(P)
+    P[P < 0] = 0 # enforce positivity
+    P /= np.sum(P,axis=0) # normalize on columns
+    return P
 
 def median_normalize(lc):
     '''
-    The extract_curves function is way too big and doing way too much, so I am going to break its
-    median normalization functionality into here.
+    Normalizes given light curve by its median value.
+
+    :param lc: 1D array. Flux values for a given light curve.
+    :return: light curve 1D array divided by its median.
     '''
     return lc/np.median(lc)
 
@@ -337,8 +441,7 @@ def clip_curve(lc, b, clip_at):
 
 def plot_curve(t, lc, title, outfile, outdir):
     '''
-    The extract_curves function is way too big and doing way too much, so I am going to break its
-    plotting functionality into here.
+    Creates and saves a plot of the given light curve to the outdir.
 
     :param t: 1D array. Timestamps of each exposure in the light curve.
     :param lc: 1D array. Flux values in the light curve.

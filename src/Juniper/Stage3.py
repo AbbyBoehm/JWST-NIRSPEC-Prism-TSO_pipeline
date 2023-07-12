@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from astropy import modeling
 from astropy.stats import sigma_clip
 from astropy.io import fits
+from scipy.ndimage import median_filter
 
 from utils import img, stitch_files
 
@@ -25,7 +26,7 @@ def doStage3(filesdir, outdir,
              spatialfilter_outlier_removal={"skip":False, "sigma":3, "kernel":(1,15)},
              laplacianfilter_outlier_removal={"skip":False, "sigma":50},
              second_bckg_subtract={"skip":False,"bckg_rows":[0,1,2,3,4,5,6,-6,-5,-4,-3,-2,-1], "sigma":3},
-             track_source_location={"skip":False,"reject_disper":False,"reject_spatial":True}
+             track_source_location={"skip":False,"reject_disper":True,"reject_spatial":True}
             ):
     '''
     Performs custom Stage 3 calibrations on all *_calints.fits files located in the filesdir.
@@ -45,6 +46,9 @@ def doStage3(filesdir, outdir,
     :param track_source_location: dict. Keywords are "skip", "reject_disper", "reject_spatial". Whether to track the location of the trace and reject outliers in the dispersion and/or spatial direction.
     :return: calibrated postprocessed_*.fits files in the outdir.
     '''
+    print("Running Stage 3 Juniper calibrations on files located in: ", filesdir)
+    t0 = time.time()
+    
     # Create the output directory if it does not yet exist.
     if not os.path.exists(outdir):
         os.makedirs(outdir)
@@ -59,8 +63,6 @@ def doStage3(filesdir, outdir,
             print(file[0].header["FILENAME"])
     
     # First, we need to stitch all the segments together. This step is not optional.
-    # It can, however, be run on additionally-calibrated files if you point it to the
-    # directory where those are held.
     segments, errors, segstarts, wavelengths, dqflags, times = stitch_files(files)
     
     print("Read all files and collected needed data.")
@@ -78,11 +80,7 @@ def doStage3(filesdir, outdir,
                       aspect=5)
     plt.savefig(os.path.join(outdir, "output_imgs_calibration/trace_extracted_region.pdf"), dpi=300)
     plt.close(fig)
-    
-    plt.imshow(np.log10(np.abs(segments[0,:,:])))
-    plt.title("Frame 0 log10 abs before Stage 3 corrections.")
-    plt.show()
-    plt.close()
+    print("Aperture created.")
     
     if not loss_stats_step["skip"]:
         num_pixels_lost_to_DQ_flags = loss_stats(dqflags, trace_aperture, outdir)
@@ -119,11 +117,6 @@ def doStage3(filesdir, outdir,
         segments = bckg_subtract(segments,
                                  bckg_rows=second_bckg_subtract["bckg_rows"],
                                  sigma=second_bckg_subtract["sigma"])
-    
-    plt.imshow(np.log10(np.abs(segments[0,:,:])))
-    plt.title("Frame 0 log10 abs after Stage 3 corrections.")
-    plt.show()
-    plt.close()
     
     if not track_source_location["skip"]:
         frames_rejected_by_source_motion = gaussian_source_track(segments,
@@ -166,6 +159,7 @@ def doStage3(filesdir, outdir,
             # All modified headers get written out.
             fits_file.writeto(outfile, overwrite=True)
     print("Wrote calibrated postprocessed_#.fits files.")
+    print("Stage 3 calibrations completed in %.3f minutes." % ((time.time() - t0)/60))
 
 def loss_stats(dqflags, trace_aperture, outdir):
     '''
@@ -197,7 +191,7 @@ def loss_stats(dqflags, trace_aperture, outdir):
             if element not in unique:
                 unique.append(element)
     del(unique[0])
-    print("The following flags were reported:")
+    print("The following JWST DQ flags were reported:")
     print(unique)
     
     # Creates an image of the aperture with flags.
@@ -263,8 +257,7 @@ def iterate_outlier_removal(segments, dqflags, trace_aperture, n, sigma):
     :param trace_aperture: dict. Keywords are "hcut1", "hcut2", "vcut1", "vcut2", all integers denoting the rows and columns respectively that define the edges of the aperture bounding the trace.
     :param n: int. Number of times to iterate.
     :param sigma: float. Sigma at which to reject outliers.
-    :return: segments array with CRs rejected, and int of how many pixels in the trace were affected
-             by this process.
+    :return: segments array with CRs rejected, and int of how many pixels in the trace were affected by this process.
     '''
     # Get borders to evaluate.
     hcut1, hcut2, vcut1, vcut2 = trace_aperture["hcut1"], trace_aperture["hcut2"], trace_aperture["vcut1"], trace_aperture["vcut2"]
@@ -302,6 +295,7 @@ def spatial_outlier_removal(segments, trace_aperture, sigma, kernel):
     :param trace_aperture: dict. Keywords are "hcut1", "hcut2", "vcut1", "vcut2", all integers denoting the rows and columns respectively that define the edges of the aperture bounding the trace.
     :param sigma: float. Sigma at which to reject outliers.
     :param kernel: tuple of odd ints. Kernel to use for spatial filtering.
+    :return: segments(t,y,x) with spatial outliers cleaned, and count int of how many pixels were flagged as outliers.
     '''
     # Get borders to evaluate.
     hcut1, hcut2, vcut1, vcut2 = trace_aperture["hcut1"], trace_aperture["hcut2"], trace_aperture["vcut1"], trace_aperture["vcut2"]
@@ -328,11 +322,12 @@ def laplacian_outlier_removal(segments, errors, trace_aperture, sigma=50, verbos
     Convolves a Laplacian kernel with the segments array to replace spatial outliers with
     the median of the surrounding 3x3 kernel.
     
-    :param segments: 3D array. The segments(t,x,y) array from which outliers will be removed.
-    :param sigma: float. Threshold of deviation from median of Laplacian image, above which a pixel
-                  will be flagged as an outlier and masked.
+    :param segments: 3D array. The segments(t,y,x) array from which outliers will be removed.
+    :param errors: 3D array. The errors(t,y,x) array used to build the noise model.
+    :param trace_aperture: dict. Defines where the aperture is. Used here for counting pixels lost to Laplacian filtering.
+    :param sigma: float. Threshold of deviation from median of Laplacian image, above which a pixel will be flagged as an outlier and masked.
     :param verbose: bool. If True, occasionally prints out a progress report.
-    :return: segments(t,x,y) array with spatial outliers masked.
+    :return: segments(t,x,y) array with spatial outliers masked, and count int of how many pixels were lost to filtering.
     '''
     # Get borders to evaluate.
     hcut1, hcut2, vcut1, vcut2 = trace_aperture["hcut1"], trace_aperture["hcut2"], trace_aperture["vcut1"], trace_aperture["vcut2"]
@@ -364,11 +359,9 @@ def laplacian_outlier_removal(segments, errors, trace_aperture, sigma=50, verbos
         NOISE = np.sqrt(median_filter(np.abs(segmentsc[k,:,:]),size=5)+rn**2)
         NOISE[NOISE <= 0] = np.min(NOISE[np.nonzero(NOISE)]) # really want to avoid nans
         if (verbose and k == 0):
-            plt.figure(figsize=(20,5))
-            plt.imshow(np.log10(NOISE))
-            plt.title("Noise model for LED")
+            fig, ax, im = img(np.log10(NOISE), aspect=5, title="Noise model for LED")
             plt.show()
-            plt.close()
+            plt.close(fig)
         
         original_shape = np.shape(segments[k,:,:])
         ss_shape = (original_shape[0]*2,original_shape[1]*2) # double subsampling
@@ -406,10 +399,7 @@ def laplacian_outlier_removal(segments, errors, trace_aperture, sigma=50, verbos
         scaled_resample[scaled_resample!=0] = 1 # for visualization
         
         if (verbose and k == 0):
-            plt.figure(figsize=(20,5))
-            plt.imshow(scaled_resample)
-            plt.title("Where CRs and hot pixels were detected")
-            plt.colorbar()
+            fig, ax, im = img(scaled_resample, aspect=5, title="Where CRs and hot pixels were detected")
             plt.show()
             plt.close()
         
@@ -458,7 +448,7 @@ def bckg_subtract(segments, bckg_rows, sigma):
     print("Additional background subtraction completed in %.3f seconds." % (time.time()-t0))
     return segments
 
-def gaussian_source_track(segments, reject_dispersion_direction=True, reject_spatial_direction=False):
+def gaussian_source_track(segments, reject_dispersion_direction=True, reject_spatial_direction=True):
     '''
     Tracks the location of the trace between frames and reports frame numbers that show
     significant deviations from the usual location.
@@ -466,7 +456,7 @@ def gaussian_source_track(segments, reject_dispersion_direction=True, reject_spa
     :param segments: 3D array. Integrations x rows x cols of data.
     :param reject_dispersion_direction: bool. Whether to reject outliers of position in the dispersion direction.
     :param reject_spatial_direction: bool. Whether to reject outliers of position in the spatial direction.
-    :return: reject_frames list of ints showing which frames are to get rejected by
+    :return: reject_frames list of ints showing which frames are to get rejected by tracking of source position.
     '''
     reject_frames = []
     t0 = time.time()

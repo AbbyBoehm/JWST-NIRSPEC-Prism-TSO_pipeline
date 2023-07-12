@@ -28,7 +28,7 @@ def doStage2(filepath, outfile, outdir,
     if not os.path.exists(outdir):
         os.makedirs(outdir)
     
-    print("Performing Stage 2 calibration on file: " + filepath)
+    print("Performing Stage 2 JWST calibration on file: " + filepath)
     print("Running JWST Stage 2 pipeline for spectroscopic data. This stage is a pure wrapper for JWST Stage 2 with no mods. Anyways...")
     t0 = time.time()
     result = Spec2Pipeline.call(filepath, output_file=outfile, output_dir=outdir,

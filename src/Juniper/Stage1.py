@@ -21,7 +21,7 @@ def doStage1(filepath, outfile, outdir,
              jump={"skip":True},
              ramp_fit={"skip":False},
              gain_scale={"skip":False},
-             one_over_f={"skip":False, "bckg_rows":[1,2,3,4,5,6,-1,-2,-3,-4,-5,-6], "sigma":1.5, "kernel":(1,15), "show":False}
+             one_over_f={"skip":False, "bckg_rows":[1,2,3,4,5,6,-1,-2,-3,-4,-5,-6], "sigma":3.0, "kernel":(5,1), "show":False}
              ):
     '''
     Performs Stage 1 calibration on one file.
@@ -38,7 +38,7 @@ def doStage1(filepath, outfile, outdir,
         os.makedirs(outdir)
     
     # Report initialization of Stage 1.
-    print("Performing Stage 1 calibration on file: " + filepath)
+    print("Performing Stage 1 JWST/Juniper calibrations on file: " + filepath)
     print("Running JWST Stage 1 pipeline starting at GroupScale and stopping before Jump...")
     
     # Collect timestamp to track how long this takes.
@@ -57,16 +57,18 @@ def doStage1(filepath, outfile, outdir,
         
         if not one_over_f["skip"]:
             # Before we ramp_fit, we perform 1/f subtraction.
-            print("Performing pre-RampFit 1/f subtraction...")
+            print("Performing Juniper pre-RampFit 1/f subtraction...")
             result.data = one_over_f_subtraction(result.data,
                                                  bckg_rows=one_over_f["bckg_rows"],
+                                                 bckg_kernel=one_over_f["kernel"],
+                                                 bckg_sigma=one_over_f["sigma"],
                                                  show=one_over_f["show"])
         else:
-            print("Skipping 1/f subtraction...")
+            print("Skipping Juniper pre-RampFit 1/f subtraction...")
         
         # Now we can resume Stage 1 calibration.
         t02 = time.time()
-        print("Resuming Stage 1 calibrations through RampFit and GainScale steps."
+        print("Resuming JWST Stage 1 pipeline calibrations through RampFit and GainScale steps."
               "\nThe RampFit step can take several minutes to hours depending on how big your dataset is,\n"
               "so I suggest you find something else to do in the meantime. Anyways...")
         
@@ -81,21 +83,21 @@ def doStage1(filepath, outfile, outdir,
                                                "jump": {"skip": True},
                                                "ramp_fit":ramp_fit,
                                                "gain_scale":gain_scale})
-        print("Finished final steps of Stage 1 calibrations in %.3f minutes." % ((time.time()-t02)/60))
+        print("Finished final steps of JWST Stage 1 pipeline in %.3f minutes." % ((time.time()-t02)/60))
     print("File calibrated and saved.")
     print("Stage 1 calibrations completed in %.3f minutes." % ((time.time() - t0)/60))
 
-
-def one_over_f_subtraction(data, bckg_rows, show):
+def one_over_f_subtraction(data, bckg_rows, bckg_kernel, bckg_sigma, show):
     '''
     Performs 1/f subtraction on the given array.
     Adapted from routine developed by Trevor Foote (tof2@cornell.edu).
     
     :param data: 4D array. Array of integrations x groups x rows x cols.
     :param bckg_rows: list of integers. Indices of the rows to use as the background region.
-    :param show: bool. Whether to show the cleaned frames. For inspection of whether this
-                 this step is working properly.
-    :return: 4D array that has been subjected to 1/f subtraction.
+    :param bckg_kernel: tuple of odd int. Kernel to use when cleaning the background region. Should be a column like (5,1) so that columns do not contaminate adjacent columns.
+    :param bckg_sigma: float. Threshold to reject outliers from the background region.
+    :param show: bool. Whether to show the cleaned frames. For inspection of whether this this step is working properly.
+    :return: 4D array that has undergone 1/f subtraction.
     '''
     # Time this step.
     t0 = time.time()
@@ -109,7 +111,7 @@ def one_over_f_subtraction(data, bckg_rows, show):
                 plt.close()
             
             # Clean the background region of outliers, so that CRs aren't propagated through the array.
-            background_region = clean(background_region, 3, (5, 1)) # cleans on rows, rejecting at 3 sigma
+            background_region = clean(background_region, bckg_sigma, bckg_kernel)
             if (i == 0 and g == 0 and show):
                 fig, ax, im = img(np.log10(np.abs(background_region)), aspect=5, vmin=None, vmax=None, norm=None)
                 plt.show()
