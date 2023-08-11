@@ -21,7 +21,7 @@ from exotic_ld import StellarLimbDarkening as SLD
 
 def img(array, aspect=1, title=None, vmin=None, vmax=None, norm=None):
     '''
-    Image plotting utility to plot the input 2D array.
+    Image plotting utility to plot the given 2D array.
     
     :param array: 2D array. Image you want to plot.
     :param aspect: float. Aspect ratio. Useful for visualizing narrow arrays.
