@@ -12,7 +12,7 @@ from astropy.stats import sigma_clip
 from astropy.io import fits
 from scipy.ndimage import median_filter
 
-from utils import img, stitch_files
+from .utils import img, stitch_files
 
 def doStage3(filesdir, outdir,
              trace_aperture={"hcut1":0,
@@ -20,6 +20,7 @@ def doStage3(filesdir, outdir,
                              "vcut1":0,
                              "vcut2":-1},
              frames_to_reject = [],
+             identified_bad_pixels = [],
              loss_stats_step={"skip":False},
              mask_flagged_pixels={"skip":False},
              iteration_outlier_removal={"skip":False, "n":2, "sigma":10},
@@ -112,6 +113,14 @@ def doStage3(filesdir, outdir,
                                                                            verbose=True)
     else:
         num_pixels_lost_by_laplacian = 0
+    
+    if identified_bad_pixels:
+        print("You have flagged {} pixels manually as bad. These will be replaced by local column median.".format(len(identified_bad_pixels)))
+        for coords in identified_bad_pixels:
+            # lst of tup, each tup is x, y of bad pixel.
+            x, y = coords
+            for i in range(np.shape(segments)[0]):
+                segments[i,y,x] = np.median(segments[i,y-2:y+3,x])
     
     if not second_bckg_subtract["skip"]:
         segments = bckg_subtract(segments,
@@ -283,7 +292,7 @@ def iterate_outlier_removal(segments, dqflags, trace_aperture, n, sigma):
                     maskcount = np.where(np.abs(segments[:, i, j] - pmed)>sigma*psigma, 1, 0)
                     masked_iter += np.count_nonzero(maskcount)
                 segments[:, i, j] = np.where(np.abs(segments[:, i, j] - pmed)>sigma*psigma, pmed, segments[:, i, j])
-        print("Performed round %.0g of %.2f-sigma temporal outlier rejection in %.3f seconds." % (iteration, sigma, time.time()-t02))
+        print("Performed round %.0g of %.2f-sigma temporal outlier rejection in %.3f seconds." % (iteration+1, sigma, time.time()-t02))
     print("Masked %.0f trace pixels for significant temporal variations in %.3f seconds." % (masked_iter, time.time()-t0))
     return segments, masked_iter
 

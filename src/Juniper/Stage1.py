@@ -8,7 +8,7 @@ from scipy import signal
 from astropy.stats import sigma_clip
 
 from jwst.pipeline import Detector1Pipeline
-from utils import img
+from .utils import img
 
 def doStage1(filepath, outfile, outdir,
              group_scale={"skip":False},

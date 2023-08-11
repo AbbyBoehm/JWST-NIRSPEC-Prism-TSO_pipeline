@@ -1,4 +1,5 @@
 import os
+import glob
 from copy import deepcopy
 
 import numpy as np
@@ -7,9 +8,9 @@ import time
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
 
-from utils import stitch_files
+from .utils import stitch_files
 
-def doStage4(filepaths, outdir,
+def doStage4(filesdir, outdir,
              trace_aperture={"hcut1":0,
                              "hcut2":-1,
                              "vcut1":0,
@@ -17,6 +18,10 @@ def doStage4(filepaths, outdir,
              mask_unstable_pixels={"skip":False,
                                    "threshold":1.0},
              extract_light_curves={"skip":False,
+                                   "binmode":"wavelength",
+                                   "columns":None,
+                                   "min_wav":None,
+                                   "max_wav":None,
                                    "wavbins":np.linspace(0.6,5.3,70),
                                    "ext_type":"box"},
              median_normalize_curves={"skip":False},
@@ -31,11 +36,11 @@ def doStage4(filepaths, outdir,
     '''
     Performs Stage 4 extractions on the files located at filepaths.
     
-    :param filepath: lst of str. Location of the postprocessed_*.fits files you want to extract spectra from.
+    :param filesdir: str. Folder holding the postprocessed_*.fits files you want to extract spectra from.
     :param outdir: str. Location where you want output images and text files to be saved to.
     :param trace_aperture: dict. Keywords are "hcut1", "hcut2", "vcut1", "vcut2", all integers denoting the rows and columns respectively that define the edges of the aperture bounding the trace.
     :param mask_unstable_pixels: dict. Keywords are "skip", "threshold". Whether to mask pixels whose normalized standard deviations are higher than the threshold value.
-    :param extract_light_curves: dict. Keywords are "skip", "wavbins", "ext_type". Whether to extract light curves using the given wavelength bin edges and the specified extraction type (options are "box", "polycol", "polyrow", "smooth", "medframe").
+    :param extract_light_curves: dict. Keywords are "skip", "binmode", "columns", "min_wav", "max_wav", "wavbins", "ext_type". Whether to extract light curves using the given wavelength bin edges or column number with wavelength limits, and the specified extraction type (options are "box", "polycol", "polyrow", "smooth", "medframe").
     :param median_normalize_curves. dict. Keyword is "skip". Whether to normalize curves by their median value.
     :param sigma_clip_curves: dict. Keywords are "skip", "b", "clip_at". Whether to sigma-clip the light curves every b points, rejecting outliers at clip_at sigma.
     :param fix_transit_times: dict. Keywords are "skip", "epoch". Whether to fix the transit times so that epoch becomes the 0-point.
@@ -43,8 +48,10 @@ def doStage4(filepaths, outdir,
     :param save_light_curves: dict. Keyword is "skip". Whether to save .txt files of the light curves.
     :return: .txt files of curves extracted from the postprocessed_*.fits files and images related to extraction.
     '''
-    print("Performing Stage 4 Juniper extractions of spectra from the data located at: {}".format(filepaths))
     t0 = time.time()
+    # Get the files to analyze.
+    filepaths = sorted(glob.glob(os.path.join(filesdir, "*.fits")))
+    print("Performing Stage 4 Juniper extractions of spectra from the data located at: {}".format(filepaths))
     
     # Grab the needed info from the file.
     segments, errors, segstarts, wavelengths, dqflags, times, frames_to_reject = stitch_files(filepaths)
@@ -69,10 +76,13 @@ def doStage4(filepaths, outdir,
     
     # Should not skip extract light curves! Rest of code breaks.
     if not extract_light_curves["skip"]:
-        wlc, slc, times, central_lams = extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject,
-                                                       wavbins=extract_light_curves["wavbins"],
-                                                       ext_type=extract_light_curves["ext_type"])
-        
+        wlc, slc, times, central_lams, wavelength_bin_edges = extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject,
+                                                                             binmode=extract_light_curves["binmode"],
+                                                                             columns=extract_light_curves["columns"],
+                                                                             wavelength_range=(extract_light_curves["min_wav"],extract_light_curves["max_wav"]),
+                                                                             wavbins=extract_light_curves["wavbins"],
+                                                                             ext_type=extract_light_curves["ext_type"])
+
     if not median_normalize_curves["skip"]:
         wlc = median_normalize(wlc)
         for i, lc in enumerate(slc):
@@ -109,15 +119,14 @@ def doStage4(filepaths, outdir,
         if not os.path.exists(txts_outdir):
             os.makedirs(txts_outdir)
         write_light_curve(times, wlc, "wlc", txts_outdir)
+        write_wvs_file(wavelength_bin_edges[0][0], wavelength_bin_edges[-1][1],-99,"wlc_wvs", txts_outdir)
         for i, lc in enumerate(slc):
-            if extract_light_curves["wavbins"][i] == extract_light_curves["wavbins"][-1]:
-                pass
-            else:
-                write_light_curve(times, lc, "slc_%.3fmu_%.3fmu" % (extract_light_curves["wavbins"][i],extract_light_curves["wavbins"][i+1]), txts_outdir)
+            write_light_curve(times, lc, "slc_%.3fmu_%.3fmu" % (wavelength_bin_edges[i][0],wavelength_bin_edges[i][1]), txts_outdir)
+            write_wvs_file(wavelength_bin_edges[i][0],wavelength_bin_edges[i][1],central_lams[i],"slc_%.3fmu_%.3fmu_wvs" % (wavelength_bin_edges[i][0],wavelength_bin_edges[i][1]), txts_outdir)
         print("Files written.")
     print("Stage 4 calibrations completed in %.3f minutes." % ((time.time() - t0)/60))
 
-def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject, wavbins, ext_type="box"):
+def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject, binmode, columns, wavelength_range, wavbins, ext_type):    
     '''
     Extract a white light curve and spectroscopic light curves from the trace.
     
@@ -128,8 +137,10 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
     :param segstarts: list of ints. Defines where new segment files begin.
     :param wavelengths: list of lists of floats. The wavelength solutions for each segment.
     :param frames_to_reject: list of ints. Frames that will not be added into the light curve.
-    :param wavbins: list of floats. The edges defining each spectroscopic light curve. The ith bin
-                    will count pixels that have wavelength solution wavbins[i] <= wav < wavbins[i+1].
+    :param binmode: str. Choices are "columns" or "wavelengths". Whether to bin by wavelength or by pixel column.
+    :param columns: int. If binmode is "columns", bin every N columns.
+    :param wavelength_range: tup of floats. If binmode is "columns", the min and max wavelength that will be included.
+    :param wavbins: list of floats. The edges defining each spectroscopic light curve. The ith bin will count pixels that have wavelength solution wavbins[i] <= wav < wavbins[i+1].
     :param ext_type: str. Choices are "box" or "polycol". The first is a standard extraction, while all the others define types of optimal extraction apertures.
     :return: corrected timestamps, median-normalized white light curve, and median-normalized spectroscopic light curve.
     '''
@@ -139,6 +150,7 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
     # Initialize 1Dspec objects.
     oneDspec = []
     central_lams = []
+    wavelength_bin_edges = []
     times_with_skips = []
 
     t0 = time.time()
@@ -157,22 +169,59 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
             
             # When we are at the start of a new segment, we have to rebuild the wavelength masks.
             if (k in segstarts or masks_built_yet == 0):
-                print("Building wavelength masks...")
                 masks = []
                 for i in range(1):
                     if (k == segstarts[i] or masks_built_yet == 0):
                         wavelength = wavelengths[i]
-                for j, w in enumerate(wavbins):
-                    if w == wavbins[-1]:
-                        # Don't build a bin at the end of the wavelength range.
-                        pass
-                    else:
-                        central_lams.append((wavbins[j]+wavbins[j+1])/2)
-                        mask_step1 = np.where(wavelength <= wavbins[j+1], wavelength, 0)
-                        mask_step2 = np.where(mask_step1 >= wavbins[j], mask_step1, 0)
-                        mask = np.where(mask_step2 != 0, 1, 0)
-                        # Now we want to invert it, setting all 0s to 1s and vice versa.
-                        mask = np.where(mask == 1, 0, 1)
+                if binmode == "wavelengths":
+                    # Build masks that contain certain wavelength ranges.
+                    print("Building wavelength masks...")
+                    for j, w in enumerate(wavbins):
+                        if w == wavbins[-1]:
+                            # Don't build a bin at the end of the wavelength range.
+                            pass
+                        else:
+                            central_lams.append((wavbins[j]+wavbins[j+1])/2)
+                            wavelength_bin_edges.append((wavbins[j], wavbins[j+1]))
+                            mask_step1 = np.where(wavelength <= wavbins[j+1], wavelength, 0)
+                            mask_step2 = np.where(mask_step1 >= wavbins[j], mask_step1, 0)
+                            mask = np.where(mask_step2 != 0, 1, 0)
+                            # Now we want to invert it, setting all 0s to 1s and vice versa. Only 0s will be allowed through the mask.
+                            mask = np.where(mask == 1, 0, 1)
+                            masks.append([mask])
+                elif binmode == "columns":
+                    # Build masks that contain a specified number of columns.
+                    print("Building column masks...")
+                    masked_wavs = np.ma.masked_array(wavelength, aperture[0,:,:])
+                    left_edge = 0
+                    right_edge = columns
+                    while right_edge < trace.shape[2]: # array is of shape time x row x col
+                        minimum_wavelength = np.ma.min(masked_wavs[:,left_edge:right_edge])
+                        maximum_wavelength = np.ma.max(masked_wavs[:,left_edge:right_edge])
+                        if (minimum_wavelength < wavelength_range[0] or maximum_wavelength > wavelength_range[1]):
+                            # Do not take masks that are outside of the accepted wavelength range.
+                            pass
+                        else:
+                            # Get the central wavelength of this region.
+                            central_lams.append(np.ma.mean(masked_wavs[:,left_edge:right_edge]))
+                            wavelength_bin_edges.append((minimum_wavelength,
+                                                        maximum_wavelength))
+                            # Make a fully opaque mask.
+                            mask = np.ones_like(wavelength)
+                            # Open it up only in the region you want to take.
+                            mask[:,left_edge:right_edge] = 0
+                            masks.append([mask])
+                        # Advance the column edges up.
+                        left_edge += columns
+                        right_edge += columns
+                    if left_edge < trace.shape[2]:
+                        # One last mask is needed to get the last columns.
+                        # Get the central wavelength of this region.
+                        central_lams.append(np.ma.mean(masked_wavs[:,left_edge:]))
+                        # Make a fully opaque mask.
+                        mask = np.ones_like(wavelength)
+                        # Open it up only in the region you want to take.
+                        mask[:,left_edge:] = 0
                         masks.append([mask])
                 masks_built_yet = 1
                 print("Masks built.")
@@ -211,19 +260,15 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
     
     slc = []
     print("Reshaping oneDspec into slc...")
-    for i, w in enumerate(wavbins):
-        if w == wavbins[-1]:
-            # Didn't build a bin for the last wavelength.
-            pass
-        else:
-            lc = []
-            for j in range(len(wlc)):
-                lc.append(oneDspec[j][i])
-            slc.append(np.array(lc))
+    for i, w in enumerate(wavelength_bin_edges):
+        lc = []
+        for j in range(len(wlc)):
+            lc.append(oneDspec[j][i])
+        slc.append(np.array(lc))
     # Now each object in slc is a full time series corresponding to just one wavelength bin.
     print("Reshaped. Returning wlc and slc...")
     
-    return wlc, slc, times_with_skips, np.round(central_lams, 3)
+    return wlc, slc, times_with_skips, np.round(central_lams, 3), wavelength_bin_edges
 
 def get_spatial_profile(segments, ext_type="polycol"):
     '''
@@ -301,29 +346,29 @@ def polyrow(trace, poly_order=10, threshold=3):
     # Initialize P as a list.
     P = []
     
-    # Iterate on columns.
-    for i in range(np.shape(trace)[1]):
-        col = deepcopy(trace[:,i])
+    # Iterate on rows.
+    for i in range(np.shape(trace)[0]):
+        row = deepcopy(trace[i,:])
         j = 0
         while True:
-            p_coeff = np.polyfit(range(np.shape(col)[0]),col,deg=poly_order)
-            p_col = np.polyval(p_coeff, range(np.shape(col)[0]))
+            p_coeff = np.polyfit(range(np.shape(row)[0]),row,deg=poly_order)
+            p_row = np.polyval(p_coeff, range(np.shape(row)[0]))
 
-            res = np.array(col-p_col)
+            res = np.array(row-p_row)
             dev = np.abs(res)/np.std(res)
             max_dev_idx = np.argmax(dev)
 
             j += 1
             if (dev[max_dev_idx] > threshold and j < 20):
                 try:
-                    col[max_dev_idx] = (col[max_dev_idx-1]+col[max_dev_idx+1])/2
+                    row[max_dev_idx] = (row[max_dev_idx-1]+row[max_dev_idx+1])/2
                 except IndexError:
-                    col[max_dev_idx] = np.median(p_col)
+                    row[max_dev_idx] = np.median(p_row)
                 continue
             else:
                 break
-        P.append(p_col)
-    P = np.array(P).T
+        P.append(p_row)
+    P = np.array(P)
     P[P < 0] = 0 # enforce positivity
     P /= np.sum(P,axis=0) # normalize on columns
     return P
@@ -475,3 +520,22 @@ def write_light_curve(t, lc, outfile, outdir):
         file.write("#time[MJD]     flux[normalized]\n")
         for ti, lci in zip(t, lc):
             file.write('{:8}   {:8}\n'.format(ti, lci))
+
+def write_wvs_file(wavmin, wavmax, central_lam, outfile, outdir):
+    '''
+    Writes wavelengths to .txt file for future reading.
+
+    :param wavmin: float. The left edge of the wavelength bin.
+    :param wavmax: float. The right edge of the wavelength bin.
+    :param central_lam: float. The central wavelength of the bin.
+    :param outfile: str. Name of the file you want to save, sans the ".txt" extension.
+    :param outdir: str. Directory where the wavelengths file will be saved to.
+    :return: wavelengths file saved to outdir/outfile.
+    '''
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+    
+    with open('{}/{}.txt'.format(outdir,outfile), mode='w') as file:
+        file.write("#wavelength [mu]\n")
+        for w in (wavmin, wavmax, central_lam):
+            file.write('{:8}\n'.format(w))
