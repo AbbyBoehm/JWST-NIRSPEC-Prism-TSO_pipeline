@@ -13,6 +13,7 @@ from astropy.io import fits
 from scipy.ndimage import median_filter
 
 from .utils import img, stitch_files
+from .Stage1 import clean
 
 def doStage3(filesdir, outdir,
              trace_aperture={"hcut1":0,

@@ -188,10 +188,18 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                             mask = np.where(mask_step2 != 0, 1, 0)
                             # Now we want to invert it, setting all 0s to 1s and vice versa. Only 0s will be allowed through the mask.
                             mask = np.where(mask == 1, 0, 1)
+                            '''
+                            plt.imshow(mask)
+                            plt.title("Mask for wavelength {}".format(central_lams[-1]))
+                            plt.show()
+                            plt.close()
+                            '''
                             masks.append([mask])
                 elif binmode == "columns":
                     # Build masks that contain a specified number of columns.
                     print("Building column masks...")
+                    for i in range(trace.shape[2]):
+                        print(i, wavelength[12,i])
                     masked_wavs = np.ma.masked_array(wavelength, aperture[0,:,:])
                     left_edge = 0
                     right_edge = columns
@@ -210,6 +218,12 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                             mask = np.ones_like(wavelength)
                             # Open it up only in the region you want to take.
                             mask[:,left_edge:right_edge] = 0
+                            '''
+                            plt.imshow(mask)
+                            plt.title("Mask for wavelength {}, columns {}, {}".format(central_lams[-1], left_edge, right_edge))
+                            plt.show()
+                            plt.close()
+                            '''
                             masks.append([mask])
                         # Advance the column edges up.
                         left_edge += columns

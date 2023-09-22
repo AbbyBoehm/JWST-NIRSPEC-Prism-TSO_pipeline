@@ -17,7 +17,12 @@ from matplotlib.ticker import FormatStrFormatter as fsf
 
 import batman
 
-from exotic_ld import StellarLimbDarkening as SLD
+try:
+    from exotic_ld import StellarLimbDarkening as SLD
+    exotic_ld_available = True
+except:
+    print("EXoTiC-LD not found on this system, fixed limb darkening coefficients will not be available.")
+    exotic_ld_available = False
 
 def img(array, aspect=1, title=None, vmin=None, vmax=None, norm=None):
     '''
@@ -227,40 +232,41 @@ def make_LSQ_bounds_object(theta_dict, priors_dict, priors_type, ld_lower, ld_up
     bounds=(lower_bounds, upper_bounds)
     return bounds
 
-def get_exotic_coefficients(exoplanet_params, stellar_params, exoticLD, custom=None):
-    if stellar_params != None:
-        # Get LD coefficients from EXoTiC-LD. If this is None, you had better have a custom model in place!
-        M_H, Teff, logg = stellar_params
-    # And wavelengths for fitting coefficients
-    spectral_range = exoticLD["spectral_range"]
-    # And set mode to PRISM
-    mode = "JWST_NIRSpec_Prism"
-    # Check for custom model.
-    if exoticLD["ld_grid"] == "custom":
-        file_path = exoticLD["custom_model_path"]
+if exotic_ld_available:
+    def get_exotic_coefficients(exoplanet_params, stellar_params, exoticLD, custom=None):
+        if stellar_params != None:
+            # Get LD coefficients from EXoTiC-LD. If this is None, you had better have a custom model in place!
+            M_H, Teff, logg = stellar_params
+        # And wavelengths for fitting coefficients
+        spectral_range = exoticLD["spectral_range"]
+        # And set mode to PRISM
+        mode = "JWST_NIRSpec_Prism"
+        # Check for custom model.
+        if exoticLD["ld_grid"] == "custom":
+            file_path = exoticLD["custom_model_path"]
 
-        s_wvs = (np.genfromtxt(file_path, skip_header = 2, usecols = [0]).T)*1e4
-        s_mus = np.flip(np.genfromtxt(file_path, skip_header = 1, max_rows = 1))
-        stellar_intensity = np.flip(np.genfromtxt(file_path, skip_header = 2)[:,1:],axis = 1)
+            s_wvs = (np.genfromtxt(file_path, skip_header = 2, usecols = [0]).T)*1e4
+            s_mus = np.flip(np.genfromtxt(file_path, skip_header = 1, max_rows = 1))
+            stellar_intensity = np.flip(np.genfromtxt(file_path, skip_header = 2)[:,1:],axis = 1)
 
-        sld = SLD(ld_data_path=exoticLD["ld_data_path"], ld_model="custom",
-                    custom_wavelengths=s_wvs, custom_mus=s_mus, custom_stellar_model=stellar_intensity)
-    else:
-        sld = SLD(M_H=M_H, Teff=Teff, logg=logg,
-                  ld_model=exoticLD["ld_grid"], ld_data_path=exoticLD["ld_data_path"],
-                  interpolate_type=exoticLD["ld_interpolate_type"], verbose=True)
-    
-    if exoplanet_params["model_type"] in ("quadratic", "kipping2013"):
-        exoplanet_params["LD_coeffs"] = sld.compute_quadratic_ld_coeffs(wavelength_range=[spectral_range[0], spectral_range[1]],
-                                                                        mode=mode, mu_min=0.0)
-    if exoplanet_params["model_type"] == "square-root":
-        exoplanet_params["LD_coeffs"] = sld.compute_squareroot_ld_coeffs(wavelength_range=[spectral_range[0], spectral_range[1]],
+            sld = SLD(ld_data_path=exoticLD["ld_data_path"], ld_model="custom",
+                        custom_wavelengths=s_wvs, custom_mus=s_mus, custom_stellar_model=stellar_intensity)
+        else:
+            sld = SLD(M_H=M_H, Teff=Teff, logg=logg,
+                    ld_model=exoticLD["ld_grid"], ld_data_path=exoticLD["ld_data_path"],
+                    interpolate_type=exoticLD["ld_interpolate_type"], verbose=True)
+        
+        if exoplanet_params["model_type"] in ("quadratic", "kipping2013"):
+            exoplanet_params["LD_coeffs"] = sld.compute_quadratic_ld_coeffs(wavelength_range=[spectral_range[0], spectral_range[1]],
                                                                             mode=mode, mu_min=0.0)
-    if exoplanet_params["model_type"] == "nonlinear":
-        exoplanet_params["LD_coeffs"] = sld.compute_4_parameter_non_linear_ld_coeffs(wavelength_range=[spectral_range[0], spectral_range[1]],
-                                                                                        mode=mode, mu_min=0.0)
-    
-    return exoplanet_params
+        if exoplanet_params["model_type"] == "square-root":
+            exoplanet_params["LD_coeffs"] = sld.compute_squareroot_ld_coeffs(wavelength_range=[spectral_range[0], spectral_range[1]],
+                                                                                mode=mode, mu_min=0.0)
+        if exoplanet_params["model_type"] == "nonlinear":
+            exoplanet_params["LD_coeffs"] = sld.compute_4_parameter_non_linear_ld_coeffs(wavelength_range=[spectral_range[0], spectral_range[1]],
+                                                                                            mode=mode, mu_min=0.0)
+        
+        return exoplanet_params
 
 def plot_fit_and_res(t, lc, err, model, interp_t, residuals):
     fig, axes = plt.subplots(2, figsize=(10, 7), sharex=True)

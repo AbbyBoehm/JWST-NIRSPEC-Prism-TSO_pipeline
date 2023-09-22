@@ -246,7 +246,7 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
                                                                             priors_type=LSQfit_spec["priors_type"],
                                                                             exoticLD=exoticLD,
                                                                             reject_threshold=reject_threshold)
-            except:
+            except ZeroDivisionError:
                 fit_theta = None
             if fit_theta is None:
                 print("Skipped fit for {}.".format(wavelength))
