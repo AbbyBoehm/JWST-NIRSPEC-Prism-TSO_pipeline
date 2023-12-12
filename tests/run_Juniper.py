@@ -1,4 +1,5 @@
 import juniper as Juniper
+import glob
 import os
 os.environ['CRDS_PATH'] = './crds_cache/jwst_ops' # set path to CRDS cache if you already have one
 
@@ -8,43 +9,125 @@ This is a test script that demos an execution of the Juniper module.
 The way this script is organised is also a handy way for you to organise your own script!
 '''
 ### OKAY, LET'S GET TO IT ###
+target = 'WASP-39b'
 
-# All the parameters needed for fitting for WD 1856 b.
-epoch = 60061.50686491065 # BJD_TDB
-exoplanet_params = {"rp":8,#7.28,
-                    "t0":0,
-                    "period":1.407939217,
-                    "aoR":339.247070534106, #340.00199310598543,
-                    "inc":88.74513993900113, #88.74395537223828,
-                    "ecc":0,
-                    "lop":90,
-                    "offset":0.0}
-priors_dict = {"t0":[0.0, 0.001],
-               "period":[1.407939217, 0.000000016],
-               "aoR":[336, 3*14],
-               "inc":[88.778, 0.059],
-               "ecc":[0, 0.8],
-               "lop":[0, 90],
-               "offset":[0.2,0.25]}
-systematics = (0,1)
-stellar_params = None # (M_H, Teff, logg)
-path_to_custom_LD_model = "/Users/abby/code_dev/jwst/WD_1856/blouin_WD1856_LDmodel/Imu_bestfitJWST.txt"
-limb_darkening_model = {"model_type":"quadratic",
-                        "custom_model":path_to_custom_LD_model,
-                        "stellar_params":stellar_params,
-                        "initial_guess":[0.0,0.0,0.0,0.0]}
-exoticLD = {"available":True,
-            "ld_data_path":"/Users/abby/opt/anaconda3/exotic_ld_data-3.1.2",
-            "ld_grid":"custom",
-            "custom_model_path":path_to_custom_LD_model,
-            "ld_interpolate_type":'trilinear'}
-priors_type = "gaussian"
+if target == 'WD1856b':
+    # The locations of the data files.
+    stage1_filepaths = ["/Users/abby/code_dev/jwst/WD_1856/JWST_WD1856-selected/jw02358030001_04101_00001-seg001_nrs1_uncal.fits",]
+    stage1_outfiles = ["WD1856b",]
+    stage1_outdir = "./processed/rateints"
+    
+    stage2_filesdir = "./processed/rateints"
+    stage2_outfiles = ["WD1856b",]
+    stage2_outdir = "./processed/calints"
+
+    stage3_filesdir = "./processed/calints"
+    stage3_outdir = "./processed/postprocessed"
+
+    stage4_filesdir = "./processed/postprocessed"
+    stage4_outdir = "./processed/extraction"
+
+    stage5_filesdir = "./processed/extraction/output_txts_extraction"
+    stage5_outdir ="./processed/fits" 
+
+    # All the parameters needed for fitting for WD 1856 b.
+    epoch = 60061.50686491065 # BJD_TDB
+    exoplanet_params = {"rp":8,#7.28,
+                        "t0":0,
+                        "period":1.407939217,
+                        "aoR":339.247070534106, #340.00199310598543,
+                        "inc":88.74513993900113, #88.74395537223828,
+                        "ecc":0,
+                        "lop":90,
+                        "offset":0.0}
+    priors_dict = {"t0":[0.0, 0.001],
+                "period":[1.407939217, 0.000000016],
+                "aoR":[336, 3*14],
+                "inc":[88.778, 0.059],
+                "ecc":[0, 0.8],
+                "lop":[0, 90],
+                "offset":[0.2,0.25]}
+    priors_type = "gaussian"
+    systematics = (0,1)
+    stellar_params = None # (M_H, Teff, logg)
+    path_to_custom_LD_model = "/Users/abby/code_dev/jwst/WD_1856/blouin_WD1856_LDmodel/Imu_bestfitJWST.txt"
+    limb_darkening_model = {"model_type":"quadratic",
+                            "custom_model":path_to_custom_LD_model,
+                            "stellar_params":stellar_params,
+                            "initial_guess":[0.0,0.0,0.0,0.0]}
+    exoticLD = {"available":True,
+                "ld_data_path":"/Users/abby/opt/anaconda3/exotic_ld_data-3.1.2",
+                "ld_grid":"custom",
+                "custom_model_path":path_to_custom_LD_model,
+                "ld_interpolate_type":'trilinear'}
+    
+if target == 'WASP-39b':
+    # The locations of the data files.
+    selecting_for = 'nrs1'
+    stage1_filepaths = []
+    stage1_outfiles = []
+    dirs = os.listdir('/Users/abby/opt/anaconda3/github_repos/juniper/tests/WASP39_ERS')
+    for dir in dirs:
+        if dir != '.DS_Store':
+            path = os.path.join('/Users/abby/opt/anaconda3/github_repos/juniper/tests/WASP39_ERS',dir)
+            files = glob.glob(os.path.join(path,'*.fits'))
+            for file in files:
+                if selecting_for in file:
+                    stage1_filepaths.append(file)
+                    outfile_name = str.replace(str.split(file,'/')[-1],'_uncal.fits','')
+                    stage1_outfiles.append(outfile_name)
+    stage1_filepaths = sorted(stage1_filepaths)
+    stage1_outfiles = sorted(stage1_outfiles)
+    stage1_outdir = "./WASP39_ERS/processed_{}/rateints".format(selecting_for)
+
+    stage2_filesdir = stage1_outdir
+    stage2_outfiles = stage1_outfiles
+    stage2_outdir = "./WASP39_ERS/processed_{}/calints".format(selecting_for)
+
+    stage3_filesdir = stage2_outdir
+    stage3_outdir = "./WASP39_ERS/processed_{}/postprocessed".format(selecting_for)
+
+    stage4_filesdir = stage3_outdir
+    stage4_outdir = "./WASP39_ERS/processed_{}/extraction".format(selecting_for)
+
+    stage5_filesdir = os.path.join(stage4_outdir,'output_txts_extraction')
+    stage5_outdir ="./WASP39_ERS/processed_{}/fits" .format(selecting_for)
+
+    # All the parameters needed for fitting for WASP-39 b.
+    epoch = 59791.115 # BJD_TDB
+    exoplanet_params = {"rp":0.1457,
+                        "t0":0,
+                        "period":4.0552765,
+                        "aoR":11.37,
+                        "inc":87.75,
+                        "ecc":0,
+                        "lop":90,
+                        "offset":0.0}
+    priors_dict = {"t0":[0.0, 0.005],
+                "period":[4.0552765, 0.0000035],
+                "aoR":[11.37, 0.24],
+                "inc":[87.75, 0.30],
+                "ecc":[0, 0.8],
+                "lop":[0, 90],
+                "offset":[0.2,0.25]}
+    priors_type = "gaussian"
+    systematics = (0,1)
+    stellar_params = (-0.12, 5400, 4.45)
+    limb_darkening_model = {"model_type":"quadratic",
+                            "custom_model":None,
+                            "stellar_params":stellar_params,
+                            "initial_guess":[0.0,0.0,0.0,0.0]}
+    exoticLD = {"available":True,
+                "ld_data_path":"/Users/abby/opt/anaconda3/exotic_ld_data-3.1.2",
+                "ld_grid":"stagger",
+                "custom_model_path":None,
+                "ld_interpolate_type":'trilinear'}
 
 fixed_param_WLC = {"LD_coeffs":True,
                    "t0":False,
-                   "period":True,
-                   "aoR":True,
-                   "inc":True,
+                   "period":False,
+                   "aoR":False,
+                   "inc":False,
                    "ecc":True,
                    "lop":True,
                    "offset":True}
@@ -58,31 +141,33 @@ fixed_param_SLC = {"LD_coeffs":True,
                    "lop":True,
                    "offset":True}
 
-stage1 = {"skip":False,
-          "filepath":"/Users/abby/code_dev/jwst/WD_1856/JWST_WD1856-selected/jw02358030001_04101_00001-seg001_nrs1_uncal.fits",
-          "outfile":"WD1856b",
-          "outdir":"./processed/rateints"}
+print("Operating on target {}...".format(target))
+
+stage1 = {"skip":True,
+          "filepaths":stage1_filepaths,
+          "outfiles":stage1_outfiles,
+          "outdir":stage1_outdir}
 
 stage2 = {"skip":True,
-          "filepath":"./processed/rateints/WD1856b_rateints.fits",
-          "outfile":"WD1856b",
-          "outdir":"./processed/calints"}
+          "filesdir":stage2_filesdir,
+          "outfiles":stage2_outfiles,
+          "outdir":stage2_outdir}
 
 stage3 = {"skip":True,
-          "filesdir":"./processed/calints",
-          "outdir":"./processed/postprocessed"}
+          "filesdir":stage3_filesdir,
+          "outdir":stage3_outdir}
 
 stage4 = {"skip":True,
-          "filesdir":"./processed/postprocessed",
-          "outdir":"./processed/extraction_revised"}
+          "filesdir":stage4_filesdir,
+          "outdir":stage4_outdir}
 
-stage5 = {"skip":True,
-          "filesdir":"./processed/extraction_revised/output_txts_extraction",
-          "outdir":"./processed/fits_revised",
+stage5 = {"skip":False,
+          "filesdir":stage5_filesdir,
+          "outdir":stage5_outdir,
           "exoplanet_params":exoplanet_params}
 
 if not stage1["skip"]:
-    Juniper.Stage1.doStage1(stage1["filepath"], stage1["outfile"], stage1["outdir"],
+    Juniper.Stage1.doStage1(stage1["filepaths"], stage1["outfiles"], stage1["outdir"],
                             group_scale={"skip":False},
                             dq_init={"skip":False},
                             saturation={"skip":False},
@@ -93,11 +178,11 @@ if not stage1["skip"]:
                             jump={"skip":True},
                             ramp_fit={"skip":False},
                             gain_scale={"skip":False},
-                            one_over_f={"skip":False, "bckg_rows":[1,2,3,4,5,6,-1,-2,-3,-4,-5,-6], "sigma":3.0, "kernel":(5,1), "show":False}
+                            one_over_f={"skip":True, "bckg_rows":[0,1,2,3,4,-1,-2,-3,-4,-5], "sigma":2.5, "kernel":(3,1), "show":False}
                             )
 
 if not stage2["skip"]:
-    Juniper.Stage2.doStage2(stage2["filepath"], stage2["outfile"], stage2["outdir"],
+    Juniper.Stage2.doStage2(stage2["filesdir"], stage2["outfiles"], stage2["outdir"],
                             assign_wcs={"skip":False},
                             extract_2d={"skip":False},
                             srctype={"skip":False},
@@ -111,39 +196,43 @@ if not stage2["skip"]:
 
 if not stage3["skip"]:
     Juniper.Stage3.doStage3(stage3["filesdir"], stage3["outdir"],
-                            trace_aperture={"hcut1":10,
-                                            "hcut2":15,
+                            trace_aperture={"hcut1":15-7,
+                                            "hcut2":15+7+1,
                                             "vcut1":0,
-                                            "vcut2":432},
+                                            "vcut2":2047},
                             frames_to_reject = [],
-                            identified_bad_pixels=[(96,10),],
+                            identified_bad_pixels=[],#[(96,10),],
                             loss_stats_step={"skip":False},
                             mask_flagged_pixels={"skip":False},
-                            iteration_outlier_removal={"skip":False, "n":2, "sigma":6.5},
+                            iteration_outlier_removal={"skip":False, "n":2, "sigma":3.5},
                             spatialfilter_outlier_removal={"skip":True, "sigma":3, "kernel":(1,15)},
                             laplacianfilter_outlier_removal={"skip":True, "sigma":50},
-                            second_bckg_subtract={"skip":False,"bckg_rows":[0,1,2,-2,-1], "sigma":3},
+                            second_bckg_subtract={"skip":False,"bckg_rows":[0,1,2,-3,-2,-1], "sigma":3},
                             track_source_location={"skip":True,"reject_disper":True,"reject_spatial":True})
     
 if not stage4["skip"]:
     Juniper.Stage4.doStage4(stage4["filesdir"], stage4["outdir"],
-                            trace_aperture={"hcut1":9,
-                                            "hcut2":16,
+                            trace_aperture={"hcut1":15-7,
+                                            "hcut2":15+7+1,
                                             "vcut1":0,
-                                            "vcut2":432},
+                                            "vcut2":2047},
                             mask_unstable_pixels={"skip":True,
                                                   "threshold":1.0},
                             extract_light_curves={"skip":False,
                                                   "binmode":"columns",
-                                                  "columns":3,
+                                                  "columns":10,
                                                   "min_wav":0.5,
                                                   "max_wav":5.5,
                                                   "wavbins":[],
-                                                  "ext_type":"medframe"},
+                                                  "ext_type":"medframe",
+                                                  "badcol_threshold":1.05},
                             median_normalize_curves={"skip":False},
-                            sigma_clip_curves={"skip":True,
+                            sigma_clip_curves={"skip":False,
                                                 "b":100,
                                                 "clip_at":5},
+                            fix_mirror_tilts={"skip":False,
+                                              "threshold":0.002,
+                                              "known_index":270},
                             fix_transit_times={"skip":False,
                                                 "epoch":epoch},
                             plot_light_curves={"skip":False},

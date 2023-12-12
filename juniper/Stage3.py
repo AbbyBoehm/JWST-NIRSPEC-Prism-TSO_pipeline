@@ -128,6 +128,18 @@ def doStage3(filesdir, outdir,
                                  bckg_rows=second_bckg_subtract["bckg_rows"],
                                  sigma=second_bckg_subtract["sigma"])
     
+    # If, after all these corrections, NaN pixels remain, 0 them out.
+    num_pixels_masked_NaN = 0
+    for i in range(trace_aperture["hcut1"],trace_aperture["hcut2"]):
+        for j in range(trace_aperture["vcut1"],trace_aperture["vcut2"]):
+            try:
+                if np.isnan(np.sum(segments[:,i,j])):
+                    segments[:,i,j] = 0
+                    num_pixels_masked_NaN += len(segments[:,i,j])
+            except IndexError:
+                pass
+    print("Identified and masked {} NaN pixels in the trace.".format(num_pixels_masked_NaN))
+
     if not track_source_location["skip"]:
         frames_rejected_by_source_motion = gaussian_source_track(segments,
                                                                  reject_dispersion_direction=track_source_location["reject_disper"],
@@ -136,7 +148,7 @@ def doStage3(filesdir, outdir,
             if frame not in frames_to_reject:
                 frames_to_reject.append(frame)
     
-    totalmasked = num_pixels_lost_by_flagging + num_pixels_lost_by_iteration + num_pixels_lost_by_filtering + num_pixels_lost_by_laplacian
+    totalmasked = num_pixels_lost_by_flagging + num_pixels_lost_by_iteration + num_pixels_lost_by_filtering + num_pixels_lost_by_laplacian + num_pixels_masked_NaN
     total = np.shape(segments)[0]*(trace_aperture["vcut2"]-trace_aperture["vcut1"])*(trace_aperture["hcut2"]-trace_aperture["hcut1"])
     print("In all, %.0f trace pixels out of %.0f were masked (fraction of %.2f) and %.0f frames will be skipped." % (totalmasked, total, totalmasked/total, len(frames_to_reject)))
     
@@ -242,7 +254,7 @@ def mask_flagged(segments, dqflags, trace_aperture):
     dq_mask = np.empty_like(dqflags)
     dq_mask[:, :, :] = np.where(dqflags[:, :, :] > 0, 1, 0)
     
-    print("Masking flagged pixels inside and outside of the trace...")
+    print("Masking flagged pixels pixels inside and outside of the trace...")
     t0 = time.time()
     masked_flagged = 0
     
@@ -281,7 +293,7 @@ def iterate_outlier_removal(segments, dqflags, trace_aperture, n, sigma):
     masked_iter = 0
     
     for iteration in range(n):
-        print("On iteration %.0f..." % iteration)
+        print("On iteration %.0f..." % (iteration+1))
         t02 = time.time()
         for i in range(np.shape(segments)[1]):
             for j in range(np.shape(segments)[2]):

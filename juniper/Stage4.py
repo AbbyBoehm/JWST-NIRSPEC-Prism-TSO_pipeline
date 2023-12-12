@@ -7,6 +7,7 @@ import time
 
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
+from scipy import signal
 
 from .utils import stitch_files
 
@@ -23,11 +24,15 @@ def doStage4(filesdir, outdir,
                                    "min_wav":None,
                                    "max_wav":None,
                                    "wavbins":np.linspace(0.6,5.3,70),
-                                   "ext_type":"box"},
+                                   "ext_type":"box",
+                                   "badcol_threshold":1.5},
              median_normalize_curves={"skip":False},
              sigma_clip_curves={"skip":False,
                                 "b":100,
                                 "clip_at":5},
+             fix_mirror_tilts={"skip":False,
+                               "threshold":0.01,
+                               "known_index":None},
              fix_transit_times={"skip":False,
                                 "epoch":None},
              plot_light_curves={"skip":False},
@@ -40,9 +45,10 @@ def doStage4(filesdir, outdir,
     :param outdir: str. Location where you want output images and text files to be saved to.
     :param trace_aperture: dict. Keywords are "hcut1", "hcut2", "vcut1", "vcut2", all integers denoting the rows and columns respectively that define the edges of the aperture bounding the trace.
     :param mask_unstable_pixels: dict. Keywords are "skip", "threshold". Whether to mask pixels whose normalized standard deviations are higher than the threshold value.
-    :param extract_light_curves: dict. Keywords are "skip", "binmode", "columns", "min_wav", "max_wav", "wavbins", "ext_type". Whether to extract light curves using the given wavelength bin edges or column number with wavelength limits, and the specified extraction type (options are "box", "polycol", "polyrow", "smooth", "medframe").
+    :param extract_light_curves: dict. Keywords are "skip", "binmode", "columns", "min_wav", "max_wav", "wavbins", "ext_type", "badcol_threshold". Whether to extract light curves using the given wavelength bin edges or column number with wavelength limits, the specified extraction type (options are "box", "polycol", "polyrow", "smooth", "medframe"), and a threshold for cutting out bad columns.
     :param median_normalize_curves. dict. Keyword is "skip". Whether to normalize curves by their median value.
     :param sigma_clip_curves: dict. Keywords are "skip", "b", "clip_at". Whether to sigma-clip the light curves every b points, rejecting outliers at clip_at sigma.
+    :param fix_mirror_tilts: dict. Keywords are "skip", "threshold". Whether to look for and fix mirror tilt events.
     :param fix_transit_times: dict. Keywords are "skip", "epoch". Whether to fix the transit times so that epoch becomes the 0-point.
     :param plot_light_curves: dict. Keyword is "skip". Whether to save plots of the light curves.
     :param save_light_curves: dict. Keyword is "skip". Whether to save .txt files of the light curves.
@@ -68,9 +74,12 @@ def doStage4(filesdir, outdir,
         print("Masking trace pixels with time variations above the specified value...")
         for y in range(trace_aperture["hcut1"],trace_aperture["hcut2"]):
             for x in range(trace_aperture["vcut1"],trace_aperture["vcut2"]):
-                if np.std(segments[:,y,x]/np.median(segments[:,y,x])) > mask_unstable_pixels["threshold"]:
-                    aperture[:,y,x] = 1
-                    masked += 1
+                try:
+                    if np.std(segments[:,y,x]/np.median(segments[:,y,x])) > mask_unstable_pixels["threshold"]:
+                        aperture[:,y,x] = 1
+                        masked += 1
+                except IndexError:
+                    pass
         n_trace_pixels = (trace_aperture["hcut2"]-trace_aperture["hcut1"])*(trace_aperture["vcut2"]-trace_aperture["vcut1"])
         print("Masked {} trace pixels out of {} for standard deviation above the threshold (fraction of {}).".format(masked, n_trace_pixels, np.round(masked/n_trace_pixels, 5)))
     
@@ -81,7 +90,8 @@ def doStage4(filesdir, outdir,
                                                                              columns=extract_light_curves["columns"],
                                                                              wavelength_range=(extract_light_curves["min_wav"],extract_light_curves["max_wav"]),
                                                                              wavbins=extract_light_curves["wavbins"],
-                                                                             ext_type=extract_light_curves["ext_type"])
+                                                                             ext_type=extract_light_curves["ext_type"],
+                                                                             badcol_threshold=extract_light_curves["badcol_threshold"])
 
     if not median_normalize_curves["skip"]:
         wlc = median_normalize(wlc)
@@ -96,6 +106,13 @@ def doStage4(filesdir, outdir,
             slc[i] = clip_curve(lc,
                                 b=sigma_clip_curves["b"],
                                 clip_at=sigma_clip_curves["clip_at"])
+    
+    if not fix_mirror_tilts["skip"]:
+        wlc, slc = correct_mirror_tilt(wlc,
+                                       slc,
+                                       threshold=fix_mirror_tilts["threshold"],
+                                       known_index=fix_mirror_tilts["known_index"])
+
             
     if not fix_transit_times["skip"]:
         print("Fixing transit timestamps...")
@@ -126,7 +143,7 @@ def doStage4(filesdir, outdir,
         print("Files written.")
     print("Stage 4 calibrations completed in %.3f minutes." % ((time.time() - t0)/60))
 
-def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject, binmode, columns, wavelength_range, wavbins, ext_type):    
+def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject, binmode, columns, wavelength_range, wavbins, ext_type, badcol_threshold):    
     '''
     Extract a white light curve and spectroscopic light curves from the trace.
     
@@ -142,15 +159,29 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
     :param wavelength_range: tup of floats. If binmode is "columns", the min and max wavelength that will be included.
     :param wavbins: list of floats. The edges defining each spectroscopic light curve. The ith bin will count pixels that have wavelength solution wavbins[i] <= wav < wavbins[i+1].
     :param ext_type: str. Choices are "box" or "polycol". The first is a standard extraction, while all the others define types of optimal extraction apertures.
+    :param badcol_threshold: float. Threshold at which to toss a column for being too unstable.
     :return: corrected timestamps, median-normalized white light curve, and median-normalized spectroscopic light curve.
     '''
+    # Update aperture so that for every frame in it, where wavelength is nan becomes masked (1).
+    for i in range(aperture.shape[0]):
+        aperture[i,:,:][np.isnan(wavelengths[0])] = 1
     # Get just the trace that you want to sum over.
+    trace = np.ma.masked_array(segments, aperture)
+
+    # Update aperture to exclude bad columns.
+    test_oneDspec = np.nansum(trace,axis=1)
+    test_oneDspec = test_oneDspec/np.median(test_oneDspec,axis=0)
+    test_oneDspec = np.std(test_oneDspec,axis=0)
+    threshold = badcol_threshold*np.mean(np.std(test_oneDspec,axis=0))
+    bad_columns = np.argwhere(test_oneDspec>threshold)
+    print("Identified and masked {} bad columns out of {} (fraction of {:.4f}).".format(len(bad_columns),len(test_oneDspec),len(bad_columns)/len(test_oneDspec)))
+    for i in range(aperture.shape[0]):
+        for col in bad_columns:
+            aperture[i,:,col] = 1
     trace = np.ma.masked_array(segments, aperture)
     
     # Initialize 1Dspec objects.
     oneDspec = []
-    central_lams = []
-    wavelength_bin_edges = []
     times_with_skips = []
 
     t0 = time.time()
@@ -170,6 +201,8 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
             # When we are at the start of a new segment, we have to rebuild the wavelength masks.
             if (k in segstarts or masks_built_yet == 0):
                 masks = []
+                central_lams = []
+                wavelength_bin_edges = []
                 for i in range(1):
                     if (k == segstarts[i] or masks_built_yet == 0):
                         wavelength = wavelengths[i]
@@ -188,6 +221,8 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                             mask = np.where(mask_step2 != 0, 1, 0)
                             # Now we want to invert it, setting all 0s to 1s and vice versa. Only 0s will be allowed through the mask.
                             mask = np.where(mask == 1, 0, 1)
+                            # Finally, where the wavelength solution is nan, mask it.
+                            mask[np.isnan(wavelength)] = 1
                             '''
                             plt.imshow(mask)
                             plt.title("Mask for wavelength {}".format(central_lams[-1]))
@@ -198,8 +233,8 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                 elif binmode == "columns":
                     # Build masks that contain a specified number of columns.
                     print("Building column masks...")
-                    for i in range(trace.shape[2]):
-                        print(i, wavelength[12,i])
+                    #for i in range(trace.shape[2]):
+                    #    print(i, wavelength[12,i])
                     masked_wavs = np.ma.masked_array(wavelength, aperture[0,:,:])
                     left_edge = 0
                     right_edge = columns
@@ -218,6 +253,8 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                             mask = np.ones_like(wavelength)
                             # Open it up only in the region you want to take.
                             mask[:,left_edge:right_edge] = 0
+                            # Remask so that nan wavelength regions are masked again.
+                            mask[np.isnan(wavelength)] = 1
                             '''
                             plt.imshow(mask)
                             plt.title("Mask for wavelength {}, columns {}, {}".format(central_lams[-1], left_edge, right_edge))
@@ -236,6 +273,8 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                         mask = np.ones_like(wavelength)
                         # Open it up only in the region you want to take.
                         mask[:,left_edge:] = 0
+                        # Remask so that nan wavelength regions are masked again.
+                        mask[np.isnan(wavelength)] = 1
                         masks.append([mask])
                 masks_built_yet = 1
                 print("Masks built.")
@@ -246,13 +285,13 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                 errors2  = errors[k,:,:]**2
                 errors2 -= trace[k,:,:]
                 errors2[errors2<=0] = 10**-8
-                f = np.sum(trace[k,:,:], axis=0)
+                f = np.nansum(trace[k,:,:], axis=0)
                 V = errors2+np.abs(f[np.newaxis,:]*profile)
                 trace[k,:,:] = (profile * trace[k,:,:] / V)/np.sum(profile ** 2 / V, axis=0)
             
             spectrum = []
             for mask in masks:
-                spectrum.append(np.sum(np.ma.masked_array(np.ma.masked_array(np.copy(trace[k, :, :]), mask), aperture[k, :, :])))
+                spectrum.append(np.nansum(np.ma.masked_array(np.ma.masked_array(np.copy(trace[k, :, :]), mask), aperture[k, :, :])))
             oneDspec.append(spectrum)
             print("Collected spectrum.")
         if (k%1000 == 0 and k != 0):
@@ -263,13 +302,12 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
             print("Average rate of integration processing: %.3f ints/s." % iterrate)
             print("Estimated time remaining: %.3f seconds.\n" % (iterremain/iterrate))
     print("Gathered 1D spectra in %.3f minutes." % ((time.time()-t0)/60))
-    
     # We now have the oneDspec object. We're going to sum the oneDspec into a wlc,
     # then reorganize the oneDspec into a bunch of spectroscopic light curves.
     print("Producing wlc from 1D spectra...")
     wlc = []
     for spectra in oneDspec:
-        wlc.append(np.sum(spectra))
+        wlc.append(np.nansum(spectra))
     print("Generated wlc.")
     
     slc = []
@@ -497,6 +535,90 @@ def clip_curve(lc, b, clip_at):
                 lc[i:-1] = lc[i:-1].filled(fill_value=np.ma.median(lc[i:-1]))
     print("Clipped %.0f values from the given light curve." % clipcount)
     return lc
+
+def correct_mirror_tilt(wlc, slc, threshold=0.01, known_index=None):
+    '''
+    Iterates over every light curve looking for mirror tilt events to correct.
+
+    :param wlc: 1D array. The white light curve. This curve is used to determine whether a tilt event happened.
+    :param slc: lst of 1D array. The spectroscopic light curves.
+    :param threshold: float. The change in flux expected of a mirror tilt event. If a jump in flux of this magnitude is detected, claim detection of a mirror tilt event.
+    :param known_index: None or int. Supply this if you already know the index of the tilt event.
+    :return: wlc and slc arrays with mirror tilt events corrected.
+    '''
+    if known_index != None:
+        tilt_occurred, where = (True, known_index)
+    else:
+        tilt_occurred, where = detect_mirror_tilt(wlc, threshold=threshold)
+    if tilt_occurred:
+        print("A mirror tilt event was detected in the white light curve. Correcting all given curves...")
+        plt.plot(wlc)
+        wlc = fix_mirror_tilt(wlc, where)
+        plt.plot(wlc)
+        plt.title("WLC before and after correction")
+        plt.show()
+        plt.close()
+        for i, lc in enumerate(slc):
+            slc[i] = fix_mirror_tilt(lc, where)
+        print("Mirror tilt event corrected. Returning fixed arrays...")
+        return wlc, slc
+    else:
+        print("No mirror tilt event detected.")
+        return wlc, slc
+
+def detect_mirror_tilt(lc, threshold=0.01):
+    '''
+    Checks the pre- and post-transit residuals to see if a mirror tilt event occurred.
+
+    :param lc: 1D array. The light curve that you want to search for a mirror tilt event in.
+    :param threshold: float. The change in flux expected of a mirror tilt event. If a jump in flux of or exceeding this value is detected, claim detection of a mirror tilt event.
+    :return: bool indicating whether a mirror tilt is believed to have occurred.    
+    '''
+    n = lc.shape[0]
+    pre_med = np.nanmedian(lc[0:int(n*0.20)])
+    post_med = np.nanmedian(lc[int(n*0.80):n])
+    Delta_tilt = np.abs(pre_med - post_med)
+    if Delta_tilt > threshold:
+        print("Within the threshold of {}, a mirror tilt event is believed to have occurred.".format(threshold))
+        print("Determining index at which tilt event happened...")
+        index_found = False
+        bad_index = 0
+        for i in np.arange(n-1,0,-1):
+            if not index_found:
+                Delta = np.abs(lc[i] - lc[i-1])
+                if Delta >= 0.75*Delta_tilt:
+                    print("Possible trip found at index {}?".format(i))
+                    # Need this to trip once and not many times.
+                    next_Delta = np.abs(lc[i-1] - lc[i-2])
+                    if next_Delta >= 0.75*Delta_tilt:
+                        print("False alarm, checking other indices...")
+                    else:
+                        print("Confirmed tilt event happened at that index.")
+                        bad_index = i
+                        index_found = True
+        if bad_index == 0:
+            print("Failed to find the index of the mirror tilt?")
+            print(1/0)
+        return True, bad_index
+    else:
+        return False, 'NA'
+
+def fix_mirror_tilt(lc, where):
+    '''
+    Corrects for a detected mirror tilt event.
+    
+    :param lc: 1D array. The light curve that you want to correct a mirror tilt event in.
+    :param where: int. The index at which the mirror tilt event first sets in.
+    :return: lc 1D array with the tilt evengt corrected.
+    '''
+    n = lc.shape[0]
+    pre_med = np.nanmedian(lc[0:int(n*0.20)])
+    post_med = np.nanmedian(lc[int(n*0.80):n])
+    Delta_tilt = pre_med - post_med
+    for i in range(where, n):
+        lc[i] += Delta_tilt
+    return lc
+    
 
 def plot_curve(t, lc, title, outfile, outdir):
     '''

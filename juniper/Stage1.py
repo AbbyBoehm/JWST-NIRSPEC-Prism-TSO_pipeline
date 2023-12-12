@@ -10,7 +10,7 @@ from astropy.stats import sigma_clip
 from jwst.pipeline import Detector1Pipeline
 from .utils import img
 
-def doStage1(filepath, outfile, outdir,
+def doStage1(filepaths, outfiles, outdir,
              group_scale={"skip":False},
              dq_init={"skip":False},
              saturation={"skip":False},
@@ -24,11 +24,11 @@ def doStage1(filepath, outfile, outdir,
              one_over_f={"skip":False, "bckg_rows":[1,2,3,4,5,6,-1,-2,-3,-4,-5,-6], "sigma":3.0, "kernel":(5,1), "show":False}
              ):
     '''
-    Performs Stage 1 calibration on one file.
+    Performs Stage 1 calibration on a list of files.
     
-    :param filepath: str. Location of the file you want to correct. The file must be of type *_uncal.fits.
-    :param outfile: str. Name to give to the calibrated file.
-    :param outdir: str. Location of where to save the calibrated file to.
+    :param filepaths: lst of str. Location of the files you want to correct. The files must be of type *_uncal.fits.
+    :param outfiles: lst of str. Names to give to the calibrated files.
+    :param outdir: str. Location of where to save the calibrated files to.
     :param group_scale, dq_init, saturation, etc.: dict. These are the dictionaries shown in the Detector1Pipeline() documentation, which control which steps are run and what parameters they are run with. Please consult jwst-pipeline.readthedocs.io for more information on these dictionaries.
     :param one_over_f: dict. Keyword "skip" is a bool that sets whether or not to perform this step. Keyword "bckg_rows" contains list of integers that selects which rows of the array are used as background for 1/f subtraction. Keyword "sigma" sets how aggressively to clean the background region before using it for subtraction. Keyword "kernel" sets the filter shape that will be used in cleaning the background region. Keyword "show" is a bool that sets whether the first group of the first integration is shown as it is cleaned.
     :return: a Stage 1 calibrated file *_rateints.fits saved to the outdir.
@@ -38,54 +38,56 @@ def doStage1(filepath, outfile, outdir,
         os.makedirs(outdir)
     
     # Report initialization of Stage 1.
-    print("Performing Stage 1 JWST/Juniper calibrations on file: " + filepath)
-    print("Running JWST Stage 1 pipeline starting at GroupScale and stopping before Jump...")
-    
-    # Collect timestamp to track how long this takes.
-    t0 = time.time()
-    with Detector1Pipeline.call(filepath,
-                                steps={"group_scale":group_scale,
-                                       "dq_init":dq_init,
-                                       "saturation":saturation,
-                                       "superbias":superbias,
-                                       "refpix":refpix,
-                                       "linearity":linearity,
-                                       "dark_current":dark_current,
-                                       "jump":jump,
-                                       "ramp_fit": {"skip": True}, "gain_scale": {"skip": True}}) as result:
-        print("Stage 1 calibrations up to step Jump resolved in %.3f seconds." % (time.time() - t0))
+    print("Performing Stage 1 JWST/Juniper calibrations on files: ", filepaths)
+    master_t0 = time.time()
+    for filepath, outfile in zip(filepaths, outfiles):
+        print("Running JWST Stage 1 pipeline on {} starting at GroupScale and stopping before Jump...".format(filepath))
         
-        if not one_over_f["skip"]:
-            # Before we ramp_fit, we perform 1/f subtraction.
-            print("Performing Juniper pre-RampFit 1/f subtraction...")
-            result.data = one_over_f_subtraction(result.data,
-                                                 bckg_rows=one_over_f["bckg_rows"],
-                                                 bckg_kernel=one_over_f["kernel"],
-                                                 bckg_sigma=one_over_f["sigma"],
-                                                 show=one_over_f["show"])
-        else:
-            print("Skipping Juniper pre-RampFit 1/f subtraction...")
-        
-        # Now we can resume Stage 1 calibration.
-        t02 = time.time()
-        print("Resuming JWST Stage 1 pipeline calibrations through RampFit and GainScale steps."
-              "\nThe RampFit step can take several minutes to hours depending on how big your dataset is,\n"
-              "so I suggest you find something else to do in the meantime. Anyways...")
-        
-        result = Detector1Pipeline.call(result, output_file=outfile, output_dir=outdir,
-                                        steps={"group_scale": {"skip": True},
-                                               "dq_init": {"skip": True},
-                                               "saturation": {"skip": True},
-                                               "superbias": {"skip": True},
-                                               "refpix": {"skip": True},
-                                               "linearity": {"skip": True},
-                                               "dark_current": {"skip": True},
-                                               "jump": {"skip": True},
-                                               "ramp_fit":ramp_fit,
-                                               "gain_scale":gain_scale})
-        print("Finished final steps of JWST Stage 1 pipeline in %.3f minutes." % ((time.time()-t02)/60))
-    print("File calibrated and saved.")
-    print("Stage 1 calibrations completed in %.3f minutes." % ((time.time() - t0)/60))
+        # Collect timestamp to track how long this takes.
+        t0 = time.time()
+        with Detector1Pipeline.call(filepath,
+                                    steps={"group_scale":group_scale,
+                                        "dq_init":dq_init,
+                                        "saturation":saturation,
+                                        "superbias":superbias,
+                                        "refpix":refpix,
+                                        "linearity":linearity,
+                                        "dark_current":dark_current,
+                                        "jump":jump,
+                                        "ramp_fit": {"skip": True}, "gain_scale": {"skip": True}}) as result:
+            print("Stage 1 calibrations up to step Jump resolved in %.3f seconds." % (time.time() - t0))
+            
+            if not one_over_f["skip"]:
+                # Before we ramp_fit, we perform 1/f subtraction.
+                print("Performing Juniper pre-RampFit 1/f subtraction...")
+                result.data = one_over_f_subtraction(result.data,
+                                                    bckg_rows=one_over_f["bckg_rows"],
+                                                    bckg_kernel=one_over_f["kernel"],
+                                                    bckg_sigma=one_over_f["sigma"],
+                                                    show=one_over_f["show"])
+            else:
+                print("Skipping Juniper pre-RampFit 1/f subtraction...")
+            
+            # Now we can resume Stage 1 calibration.
+            t02 = time.time()
+            print("Resuming JWST Stage 1 pipeline calibrations through RampFit and GainScale steps."
+                "\nThe RampFit step can take several minutes to hours depending on how big your dataset is,\n"
+                "so I suggest you find something else to do in the meantime. Anyways...")
+            
+            result = Detector1Pipeline.call(result, output_file=outfile, output_dir=outdir,
+                                            steps={"group_scale": {"skip": True},
+                                                "dq_init": {"skip": True},
+                                                "saturation": {"skip": True},
+                                                "superbias": {"skip": True},
+                                                "refpix": {"skip": True},
+                                                "linearity": {"skip": True},
+                                                "dark_current": {"skip": True},
+                                                "jump": {"skip": True},
+                                                "ramp_fit":ramp_fit,
+                                                "gain_scale":gain_scale})
+            print("Finished final steps of JWST Stage 1 pipeline in %.3f minutes." % ((time.time()-t02)/60))
+        print("File " + filepath + " calibrated and saved in %.3f minutes." % ((time.time() - t0)/60))
+    print("All files calibrated. Stage 1 completed in %.3f minutes." % ((time.time() - master_t0)/60))
 
 def one_over_f_subtraction(data, bckg_rows, bckg_kernel, bckg_sigma, show):
     '''
