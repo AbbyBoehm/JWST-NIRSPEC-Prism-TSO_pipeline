@@ -26,7 +26,8 @@ def doStage4(filesdir, outdir,
                                    "wavbins":np.linspace(0.6,5.3,70),
                                    "ext_type":"box",
                                    "badcol_threshold":1.5},
-             median_normalize_curves={"skip":False},
+             median_normalize_curves={"skip":False,
+                                      "event_type":"transit"},
              sigma_clip_curves={"skip":False,
                                 "b":100,
                                 "clip_at":5},
@@ -35,7 +36,8 @@ def doStage4(filesdir, outdir,
                                "known_index":None},
              fix_transit_times={"skip":False,
                                 "epoch":None},
-             plot_light_curves={"skip":False},
+             plot_light_curves={"skip":False,
+                                "event_type":"transit"},
              save_light_curves={"skip":False}
             ):
     '''
@@ -46,7 +48,7 @@ def doStage4(filesdir, outdir,
     :param trace_aperture: dict. Keywords are "hcut1", "hcut2", "vcut1", "vcut2", all integers denoting the rows and columns respectively that define the edges of the aperture bounding the trace.
     :param mask_unstable_pixels: dict. Keywords are "skip", "threshold". Whether to mask pixels whose normalized standard deviations are higher than the threshold value.
     :param extract_light_curves: dict. Keywords are "skip", "binmode", "columns", "min_wav", "max_wav", "wavbins", "ext_type", "badcol_threshold". Whether to extract light curves using the given wavelength bin edges or column number with wavelength limits, the specified extraction type (options are "box", "polycol", "polyrow", "smooth", "medframe"), and a threshold for cutting out bad columns.
-    :param median_normalize_curves. dict. Keyword is "skip". Whether to normalize curves by their median value.
+    :param median_normalize_curves. dict. Keywords are "skip", "event_type". Whether to normalize curves by their median value. "event_type" specifies "transit" or "eclipse".
     :param sigma_clip_curves: dict. Keywords are "skip", "b", "clip_at". Whether to sigma-clip the light curves every b points, rejecting outliers at clip_at sigma.
     :param fix_mirror_tilts: dict. Keywords are "skip", "threshold". Whether to look for and fix mirror tilt events.
     :param fix_transit_times: dict. Keywords are "skip", "epoch". Whether to fix the transit times so that epoch becomes the 0-point.
@@ -94,9 +96,11 @@ def doStage4(filesdir, outdir,
                                                                              badcol_threshold=extract_light_curves["badcol_threshold"])
 
     if not median_normalize_curves["skip"]:
-        wlc = median_normalize(wlc)
+        wlc = median_normalize(wlc,
+                               event_type=median_normalize_curves["event_type"])
         for i, lc in enumerate(slc):
-            slc[i] = median_normalize(lc)
+            slc[i] = median_normalize(lc,
+                                      event_type=median_normalize_curves["event_type"])
     
     if not sigma_clip_curves["skip"]:
         wlc = clip_curve(wlc,
@@ -115,7 +119,7 @@ def doStage4(filesdir, outdir,
 
             
     if not fix_transit_times["skip"]:
-        print("Fixing transit timestamps...")
+        print("Fixing transit/eclipse timestamps...")
         times=fix_times(times, wlc=wlc,
                         epoch=fix_transit_times["epoch"])
         print("Fixed.")
@@ -125,9 +129,9 @@ def doStage4(filesdir, outdir,
         imgs_outdir = os.path.join(outdir, "output_imgs_extraction")
         if not os.path.exists(imgs_outdir):
             os.makedirs(imgs_outdir)
-        plot_curve(times, wlc, "White light curve", "wlc", imgs_outdir)
+        plot_curve(times, wlc, plot_light_curves["event_type"], "White light curve", "wlc", imgs_outdir)
         for lc, central_lam in zip(slc, central_lams):
-            plot_curve(times, lc, "Spectroscopic light curve at %.3f micron" % central_lam, "slc_%.3fmu" % central_lam, imgs_outdir)
+            plot_curve(times, lc, plot_light_curves["event_type"], "Spectroscopic light curve at %.3f micron" % central_lam, "slc_%.3fmu" % central_lam, imgs_outdir)
         print("Plots generated.")
     
     if not save_light_curves["skip"]:
@@ -172,8 +176,31 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
     test_oneDspec = np.nansum(trace,axis=1)
     test_oneDspec = test_oneDspec/np.median(test_oneDspec,axis=0)
     test_oneDspec = np.std(test_oneDspec,axis=0)
-    threshold = badcol_threshold*np.mean(np.std(test_oneDspec,axis=0))
-    bad_columns = np.argwhere(test_oneDspec>threshold)
+    medfilt_test = signal.medfilt(test_oneDspec, 7)
+    test_diff = np.abs(test_oneDspec - medfilt_test)
+    threshold = badcol_threshold*np.mean(test_diff)
+    plt.plot(test_oneDspec, color='k')
+    plt.plot(medfilt_test, ls='--', color='red')
+    plt.title("Standard deviation by column")
+    plt.xlabel("column #")
+    plt.ylabel("std dev")
+    plt.show()
+    plt.close()
+    satisfied = False
+    while not satisfied:
+        plt.plot(test_diff)
+        plt.axhline(threshold, ls='--', color='red')
+        plt.title("Where standard deviation is unexpectedly high")
+        plt.xlabel("column #")
+        plt.ylabel("abs(median filtered - true std dev)")
+        plt.show()
+        plt.close()
+        change = int(input("Change threshold? Yes (1) or no (0): "))
+        if change == 0:
+            satisfied = True
+        elif change == 1:
+            threshold = float(input("New threshold: "))
+    bad_columns = np.argwhere(test_diff>threshold)
     print("Identified and masked {} bad columns out of {} (fraction of {:.4f}).".format(len(bad_columns),len(test_oneDspec),len(bad_columns)/len(test_oneDspec)))
     for i in range(aperture.shape[0]):
         for col in bad_columns:
@@ -480,14 +507,21 @@ def smooth(trace, threshold=3, window_len=21):
     P /= np.sum(P,axis=0) # normalize on columns
     return P
 
-def median_normalize(lc):
+def median_normalize(lc, event_type):
     '''
     Normalizes given light curve by its median value.
 
     :param lc: 1D array. Flux values for a given light curve.
+    :param event_type: str. Specifies "eclipse" or "transit", normalizes by the correct median. If unspecified, normalize by median of entire light curve.
     :return: light curve 1D array divided by its median.
     '''
-    return lc/np.median(lc)
+    if event_type == "transit":
+        med = np.median(lc[0:int(0.3*len(lc))])
+    elif event_type == "eclipse":
+        med = np.median(lc[int(0.3*len(lc)):int(0.6*len(lc))])
+    else:
+        med = np.median(lc)
+    return lc/med
 
 def fix_times(times, wlc=None, epoch=None):
     '''
@@ -620,12 +654,13 @@ def fix_mirror_tilt(lc, where):
     return lc
     
 
-def plot_curve(t, lc, title, outfile, outdir):
+def plot_curve(t, lc, event_type, title, outfile, outdir):
     '''
     Creates and saves a plot of the given light curve to the outdir.
 
     :param t: 1D array. Timestamps of each exposure in the light curve.
     :param lc: 1D array. Flux values in the light curve.
+    :param event_type: str. "transit" or "eclipse".
     :param title: str. Title of the plot.
     :param outfile: str. Name of the file you want to save, sans the ".pdf" extension.
     :param outdir: str. Directory where the light curve plot will be saved to.
@@ -633,7 +668,7 @@ def plot_curve(t, lc, title, outfile, outdir):
     '''
     fig, ax = plt.subplots(figsize=(20, 5))
     ax.scatter(t, lc, s=3)
-    ax.set_xlabel("time since mid-transit [days]")
+    ax.set_xlabel("time since mid-{} [days]".format(event_type))
     ax.set_ylabel("relative flux [no units]")
     ax.set_title(title)
     plt.savefig(os.path.join(outdir, outfile + ".pdf"), dpi=300)

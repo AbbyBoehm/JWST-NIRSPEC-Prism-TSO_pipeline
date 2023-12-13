@@ -12,6 +12,8 @@ The way this script is organised is also a handy way for you to organise your ow
 target = 'WASP-39b'
 
 if target == 'WD1856b':
+    # The event type, "transit" or "eclipse".
+    event_type = "transit"
     # The locations of the data files.
     stage1_filepaths = ["/Users/abby/code_dev/jwst/WD_1856/JWST_WD1856-selected/jw02358030001_04101_00001-seg001_nrs1_uncal.fits",]
     stage1_outfiles = ["WD1856b",]
@@ -62,6 +64,8 @@ if target == 'WD1856b':
                 "ld_interpolate_type":'trilinear'}
     
 if target == 'WASP-39b':
+    # The event type, "transit" or "eclipse".
+    event_type = "transit"
     # The locations of the data files.
     selecting_for = 'nrs1'
     stage1_filepaths = []
@@ -122,18 +126,84 @@ if target == 'WASP-39b':
                 "ld_grid":"stagger",
                 "custom_model_path":None,
                 "ld_interpolate_type":'trilinear'}
+    
+if target == 'WASP-52b':
+    # The event type, "transit" or "eclipse".
+    event_type = "eclipse"
+    # The locations of the data files.
+    stage1_filepaths = []
+    stage1_outfiles = []
+    dir = '/Users/abby/opt/anaconda3/github_repos/juniper/tests/WASP52_GTO1224/JWST_WASP52_Prism-selected'
+    files = glob.glob(os.path.join(dir,'*.fits'))
+    for file in files:
+        stage1_filepaths.append(file)
+        outfile_name = str.replace(str.split(file,'/')[-1],'_uncal.fits','')
+        stage1_outfiles.append(outfile_name)
+    stage1_filepaths = sorted(stage1_filepaths)
+    stage1_outfiles = sorted(stage1_outfiles)
+    stage1_outdir = "./WASP52_GTO1224/processed/rateints"
 
-fixed_param_WLC = {"LD_coeffs":True,
+    stage2_filesdir = stage1_outdir
+    stage2_outfiles = stage1_outfiles
+    stage2_outdir = "./WASP52_GTO1224/processed/calints"
+
+    stage3_filesdir = stage2_outdir
+    stage3_outdir = "./WASP52_GTO1224/processed/postprocessed"
+
+    stage4_filesdir = stage3_outdir
+    stage4_outdir = "./WASP52_GTO1224/processed/extraction"
+
+    stage5_filesdir = os.path.join(stage4_outdir,'output_txts_extraction')
+    stage5_outdir ="./WASP52_GTO1224/processed/fits"
+
+    # All the parameters needed for fitting for WASP-52 b.
+    epoch = 59791.115+314.4 # BJD_TDB
+    exoplanet_params = {"rp":0.1639,
+                        "fp":0.002,
+                        "t_secondary":0,
+                        "period":1.749779800,
+                        "aoR":7.22,
+                        "inc":85.17,
+                        "ecc":0,
+                        "lop":90,
+                        "offset":0.0}
+    priors_dict = {"t_secondary":[0.0, 0.005],
+                "period":[1.749779800, 0.0],
+                "aoR":[7.22, 0.07],
+                "inc":[85.17, 0.13],
+                "ecc":[0, 0.8],
+                "lop":[0, 90],
+                "offset":[0.2,0.25]}
+    priors_type = "gaussian"
+    systematics = (0,1)
+    stellar_params = (0.03, 5000, 4.5)
+    limb_darkening_model = {"model_type":"quadratic",
+                            "custom_model":None,
+                            "stellar_params":stellar_params,
+                            "initial_guess":[0.0,0.0]} # locked to [0.0, 0.0] because this is an eclipse!
+    exoticLD = {"available":False,
+                "ld_data_path":"/Users/abby/opt/anaconda3/exotic_ld_data-3.1.2",
+                "ld_grid":"stagger",
+                "custom_model_path":None,
+                "ld_interpolate_type":'trilinear'}
+
+fixed_param_WLC = {"rp":False,
+                   "fp":True,
+                   "LD_coeffs":True,
                    "t0":False,
-                   "period":False,
+                   "t_secondary":True,
+                   "period":True,
                    "aoR":False,
                    "inc":False,
                    "ecc":True,
                    "lop":True,
                    "offset":True}
 
-fixed_param_SLC = {"LD_coeffs":True,
+fixed_param_SLC = {"rp":False,
+                   "fp":True,
+                   "LD_coeffs":True,
                    "t0":True,
+                   "t_secondary":True,
                    "period":True,
                    "aoR":True,
                    "inc":True,
@@ -143,12 +213,12 @@ fixed_param_SLC = {"LD_coeffs":True,
 
 print("Operating on target {}...".format(target))
 
-stage1 = {"skip":True,
+stage1 = {"skip":False,
           "filepaths":stage1_filepaths,
           "outfiles":stage1_outfiles,
           "outdir":stage1_outdir}
 
-stage2 = {"skip":True,
+stage2 = {"skip":False,
           "filesdir":stage2_filesdir,
           "outfiles":stage2_outfiles,
           "outdir":stage2_outdir}
@@ -161,7 +231,7 @@ stage4 = {"skip":True,
           "filesdir":stage4_filesdir,
           "outdir":stage4_outdir}
 
-stage5 = {"skip":False,
+stage5 = {"skip":True,
           "filesdir":stage5_filesdir,
           "outdir":stage5_outdir,
           "exoplanet_params":exoplanet_params}
@@ -178,7 +248,7 @@ if not stage1["skip"]:
                             jump={"skip":True},
                             ramp_fit={"skip":False},
                             gain_scale={"skip":False},
-                            one_over_f={"skip":True, "bckg_rows":[0,1,2,3,4,-1,-2,-3,-4,-5], "sigma":2.5, "kernel":(3,1), "show":False}
+                            one_over_f={"skip":False, "bckg_rows":[0,1,2,3,4,5,-1,-2,-3,-4,-5,-6], "sigma":2.5, "kernel":(3,1), "show":False}
                             )
 
 if not stage2["skip"]:
@@ -194,12 +264,14 @@ if not stage2["skip"]:
                             extract_1d={"skip":True}
                             )
 
+# For G395H, 15-7, 15+7+1, 0, 1271/2047.
+# For PRISM, 7-4, 7+4+1, 0, 431.
 if not stage3["skip"]:
     Juniper.Stage3.doStage3(stage3["filesdir"], stage3["outdir"],
                             trace_aperture={"hcut1":15-7,
                                             "hcut2":15+7+1,
                                             "vcut1":0,
-                                            "vcut2":2047},
+                                            "vcut2":1271},
                             frames_to_reject = [],
                             identified_bad_pixels=[],#[(96,10),],
                             loss_stats_step={"skip":False},
@@ -215,7 +287,7 @@ if not stage4["skip"]:
                             trace_aperture={"hcut1":15-7,
                                             "hcut2":15+7+1,
                                             "vcut1":0,
-                                            "vcut2":2047},
+                                            "vcut2":1271},
                             mask_unstable_pixels={"skip":True,
                                                   "threshold":1.0},
                             extract_light_curves={"skip":False,
@@ -225,21 +297,23 @@ if not stage4["skip"]:
                                                   "max_wav":5.5,
                                                   "wavbins":[],
                                                   "ext_type":"medframe",
-                                                  "badcol_threshold":1.05},
-                            median_normalize_curves={"skip":False},
+                                                  "badcol_threshold":8.0},
+                            median_normalize_curves={"skip":False,
+                                                     "event_type":event_type},
                             sigma_clip_curves={"skip":False,
                                                 "b":100,
-                                                "clip_at":5},
+                                                "clip_at":3},
                             fix_mirror_tilts={"skip":False,
                                               "threshold":0.002,
                                               "known_index":270},
                             fix_transit_times={"skip":False,
-                                                "epoch":epoch},
-                            plot_light_curves={"skip":False},
+                                               "epoch":epoch},
+                            plot_light_curves={"skip":False,
+                                               "event_type":event_type},
                             save_light_curves={"skip":False})
 
 if not stage5["skip"]:
-    Juniper.Stage5.doStage5(stage5["filesdir"], stage5["outdir"], reject_threshold=3, raise_alarm=10,
+    Juniper.Stage5.doStage5(stage5["filesdir"], stage5["outdir"], event_type=event_type, reject_threshold=3, raise_alarm=10,
                             LSQfit_WLC={"do":True,
                                         "exoplanet_params":exoplanet_params,
                                         "systematics":systematics,

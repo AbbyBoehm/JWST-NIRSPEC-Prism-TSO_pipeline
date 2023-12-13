@@ -109,11 +109,15 @@ def stitch_files(files):
             fitsfile.close()
         return segments, errors, segstarts, wavelengths, dqflags, times
     
-def initialize_batman_params(exoplanet_params):
+def initialize_batman_params(exoplanet_params, event_type):
     params = batman.TransitParams()
-    params.t0 = exoplanet_params["t0"]                                      #time of inferior conjunction in days
     params.per = exoplanet_params["period"]                                 #orbital period in days
     params.rp = exoplanet_params["rp"]                                      #planet radius (in units of stellar radii)
+    if event_type == "transit":
+        params.t0 = exoplanet_params["t0"]                                  #time of inferior conjunction in days
+    if event_type == "eclipse":
+        params.fp = exoplanet_params["fp"]                                  #planet flux (in units of stellar flux)
+        params.t_secondary = exoplanet_params["t_secondary"]                #time of superior conjunction in days
     params.a = exoplanet_params["aoR"]                                      #semi-major axis (in units of stellar radii)
     params.inc = exoplanet_params["inc"]                                    #orbital inclination (in degrees)
     params.ecc = exoplanet_params["ecc"]                                    #eccentricity
@@ -123,12 +127,15 @@ def initialize_batman_params(exoplanet_params):
 
     return params
 
-def build_theta_dict(a1, a2, rp, exoplanet_params, fixed_param):
+def build_theta_dict(a1, a2, exoplanet_params, fixed_param):
     theta_guess = {}
     
     theta_guess["a1"] = a1
     theta_guess["a2"] = a2
-    theta_guess["rp"] = rp
+    #if "rp" in list(exoplanet_params.keys()):
+    #    theta_guess["rp"] = exoplanet_params["rp"]
+    #if "fp" in list(exoplanet_params.keys()):
+    #    theta_guess["fp"] = exoplanet_params["fp"]
     
     for parameter in fixed_param.keys():
         if not fixed_param[parameter]:
@@ -139,13 +146,18 @@ def build_theta_dict(a1, a2, rp, exoplanet_params, fixed_param):
 def update_params(theta, params):
     a1 = theta["a1"]
     a2 = theta["a2"]
-    params.rp = theta["rp"]
     
     fit_params = theta.keys()
+    if "rp" in fit_params:
+        params.rp = theta["rp"]
+    if "fp" in fit_params:
+        params.fp = theta["fp"]
     if "LD_coeffs" in fit_params:
         params.u = theta["LD_coeffs"]
     if "t0" in fit_params:
         params.t0 = theta["t0"]
+    if "t_secondary" in fit_params:
+        params.t_secondary = theta["t_secondary"]
     if "period" in fit_params:
         params.per = theta["period"]
     if "aoR" in fit_params:
@@ -229,6 +241,8 @@ def make_LSQ_bounds_object(theta_dict, priors_dict, priors_type, ld_lower, ld_up
         else:
             lower_bounds.append(-np.inf)
             upper_bounds.append(np.inf)
+        #print("Supplying following bounds for key: ", key)
+        #print(lower_bounds[-1], upper_bounds[-1])
     bounds=(lower_bounds, upper_bounds)
     return bounds
 
@@ -317,15 +331,17 @@ def write_run_to_text(outdir, outfile, fit_theta, err_theta, fit_err,
         f.write("SDNR of residuals:\n")
         f.write("SDNR(ppm),{}\n".format(fit_err*10**6))
         
-        dummy_dict = {}
-        dummy_dict["rp"] = 0
         f.write("Depths of fit:\n")
-        depth, depth_err = compute_depth_rprs(fit_theta, err_theta)
-        f.write("Rp/Rs,{},{}\n".format(depth,depth_err))
-        depth, depth_err = compute_depth_rprs2(fit_theta, err_theta)
-        f.write("(Rp/Rs)^2,{},{}\n".format(depth,depth_err))
-        depth, depth_err = compute_depth_aoverlap(fit_theta, err_theta, exoplanet_params)
-        f.write("A_overlap/A*,{},{}\n".format(depth,depth_err))
+        if "rp" in fit_theta.keys():
+            depth, depth_err = compute_depth_rprs(fit_theta, err_theta)
+            f.write("(Rp/Rs),{},{}\n".format(depth,depth_err))
+            depth, depth_err = compute_depth_rprs2(fit_theta, err_theta)
+            f.write("(Rp/Rs)^2,{},{}\n".format(depth,depth_err))
+            depth, depth_err = compute_depth_aoverlap(fit_theta, err_theta, exoplanet_params)
+            f.write("A_overlap/A*,{},{}\n".format(depth,depth_err))
+        if "fp" in fit_theta.keys():
+            depth, depth_err = compute_depth_fpfs(fit_theta, err_theta)
+            f.write("(Fp/Fs),{},{}\n".format(depth,depth_err))
 
         f.write("Run parameters - exoplanet_params:\n")
         for key in exoplanet_params.keys():
@@ -352,7 +368,7 @@ def write_run_to_text(outdir, outfile, fit_theta, err_theta, fit_err,
         for key in exoticLD.keys():
             f.write("{},{}\n".format(key,exoticLD[key]))
 
-def get_transit_spectrum(thetas, errs, SDNRs, exoplanet_params, depth_type, ignore_high_SDNR=False, SDNRlimit=12000):
+def get_spectrum(thetas, errs, SDNRs, exoplanet_params, depth_type, ignore_high_SDNR=False, SDNRlimit=12000):
     wavelengths = [i for i in thetas.keys()]
     retained_wavelengths = []
     depths = []
@@ -370,6 +386,8 @@ def get_transit_spectrum(thetas, errs, SDNRs, exoplanet_params, depth_type, igno
             depth, depth_err = compute_depth_rprs2(theta, theta_err)
         if depth_type == "aoverlap":
             depth, depth_err = compute_depth_aoverlap(theta, theta_err, exoplanet_params)
+        if depth_type == "fpfs":
+            depth, depth_err = compute_depth_fpfs(theta, theta_err)
         
         if (ignore_high_SDNR and SDNR > SDNRlimit):
             print("Depth at wavelength {} had residuals in excess of {} ppm and will be ignored...".format(l, SDNRlimit))
@@ -382,7 +400,7 @@ def get_transit_spectrum(thetas, errs, SDNRs, exoplanet_params, depth_type, igno
     wavelengths = [float(x) for x in retained_wavelengths]
     return wavelengths, depths, depth_errs
 
-def write_transit_spectrum(outdir, outfile, wavelengths, depths, depth_errs):
+def write_spectrum(outdir, outfile, wavelengths, depths, depth_errs):
     with open(os.path.join(outdir, outfile),mode="w") as f:
         f.write("#wavelength[AA]     bin[AA]     depth[na]     err[na]\n")
         for i in range(0, len(wavelengths)-1):
@@ -408,7 +426,7 @@ def plot_transit_spectrum(wavelengths, depths, depth_errs, reference_wavelengths
     ax.errorbar(wavelengths, depths, yerr=depth_errs, fmt="none", capsize=0, ecolor="k", elinewidth=2)
 
     ax.set_xlabel("wavelength [mu]", fontsize=14)
-    ax.set_ylabel("transit depth [dimensionless]", fontsize=14)
+    ax.set_ylabel("transit depth [%]", fontsize=14)
     try:
         ax.set_ylim(100*ylim[0], 100*ylim[1])
     except ValueError:
@@ -424,7 +442,39 @@ def plot_transit_spectrum(wavelengths, depths, depth_errs, reference_wavelengths
     ax.tick_params(which="both", axis="both", direction="in", pad=5, labelsize=10)
     return fig, ax
 
-def plot_multiple_spectra(thetas, errs, SDNRs, exoplanet_params, depth_type):
+def plot_eclipse_spectrum(wavelengths, depths, depth_errs, reference_wavelengths, reference_depths, reference_errs, reference_names, ylim):
+    fig, ax = plt.subplots(figsize=(20,7))
+    colors = ("red","blue","forestgreen","gold","orange","indigo","violet")
+    if reference_depths:
+        for reference_wavelength, reference_depth, reference_err, reference_name, color in zip(reference_wavelengths,reference_depths,reference_errs,reference_names,colors):
+            print("Plotting reference spectrum with {} points...".format(len(reference_depth)))
+            ax.scatter(reference_wavelength, reference_depth, s=20, color=color, marker="o", label=reference_name)
+            ax.errorbar(reference_wavelength, reference_depth, yerr=reference_err, fmt="none", capsize=0, ecolor=color, elinewidth=2)
+    # Mask NaNs so that plots can always be made even if NaNs are present.
+    depths = np.ma.masked_invalid([1e6*x for x in depths])
+    depth_errs = np.ma.masked_array(np.array([1e6*x for x in depth_errs]), np.ma.getmask(depths))
+    wavelengths = np.ma.masked_array(np.array(wavelengths), np.ma.getmask(depths))
+    ax.scatter(wavelengths, depths, s=20, color="k", marker="o", label="this reduction")
+    ax.errorbar(wavelengths, depths, yerr=depth_errs, fmt="none", capsize=0, ecolor="k", elinewidth=2)
+
+    ax.set_xlabel("wavelength [mu]", fontsize=14)
+    ax.set_ylabel("eclipse depth [ppm]", fontsize=14)
+    try:
+        ax.set_ylim(1e6*ylim[0], 1e6*ylim[1])
+    except ValueError:
+        # Happens if NaNs or Infs are present, just recalculate limits with masked arrays.
+        ylim = (0.95*np.min(depths), 1.05*np.max(depths))
+        ax.set_ylim(ylim[0], ylim[1])
+    #ax.xaxis.set_major_formatter(fsf("%.0g"))
+    ax.yaxis.set_major_formatter(fsf("%.2f"))
+    #ax.xaxis.set_minor_formatter(nulf())
+    #ax.xaxis.set_minor_locator(aml(4))
+    ax.legend()
+    
+    ax.tick_params(which="both", axis="both", direction="in", pad=5, labelsize=10)
+    return fig, ax
+
+def plot_multiple_spectra(thetas, errs, event_type, SDNRs, exoplanet_params, depth_type):
     fig, ax = plt.subplots(figsize=(20,7))
     orders = list(thetas.keys())
     colors = ("red","blue","forestgreen","gold","orange","indigo","violet")
@@ -435,7 +485,7 @@ def plot_multiple_spectra(thetas, errs, SDNRs, exoplanet_params, depth_type):
         order_thetas = {order:thetas[order]}
         order_thetaerrs = {order:errs[order]}
         order_SDNRs = {order:SDNRs[order]}
-        wavelengths, depths, depth_errs = get_transit_spectrum(order_thetas, order_thetaerrs, order_SDNRs, exoplanet_params, depth_type, ignore_high_SDNR=False)
+        wavelengths, depths, depth_errs = get_spectrum(order_thetas, order_thetaerrs, order_SDNRs, exoplanet_params, depth_type, ignore_high_SDNR=False)
         # Check mins and maxes.
         if min(depths) < d_min:
             d_min = min(depths)
@@ -449,7 +499,7 @@ def plot_multiple_spectra(thetas, errs, SDNRs, exoplanet_params, depth_type):
         ax.errorbar(wavelengths, depths, yerr=depth_errs, fmt="none", capsize=0, ecolor=color, elinewidth=2)
     
     ax.set_xlabel("wavelength [mu]", fontsize=14)
-    ax.set_ylabel("transit depth [dimensionless]", fontsize=14)
+    ax.set_ylabel("{} depth [%]".format(event_type), fontsize=14)
     ax.set_ylim(100*d_min, 100*d_max)
     ax.yaxis.set_major_formatter(fsf("%.2f"))
     ax.legend()
@@ -471,7 +521,7 @@ def plot_SDNRs(SDNRs):
     ax.tick_params(which="both", axis="both", direction="in", pad=5, labelsize=10)
     return fig, ax
 
-def plot_waterfall_fitres(timestamps, slc, slc_err, models, reses, offset=0.025):
+def plot_waterfall_fitres(timestamps, slc, slc_err, event_type, models, reses, offset=0.025):
     '''
     Produces a waterfall plot of the given slc[t,lambda] object, using the wavelengths object to assign colors to each curve.
     Also overplots the fitted light curve. To the right, plots the normalized residuals in a corresponding waterfall.
@@ -479,6 +529,7 @@ def plot_waterfall_fitres(timestamps, slc, slc_err, models, reses, offset=0.025)
     :param timestamps: np array. The timestamps in days.
     :param slc: np array. The curves[Order#,t,lambda] object storing all spectroscopic transit curves. Must be median-normalized.
     :param slc_err: np array. The error on the curves objects.
+    :param event_type: str. "transit" or "eclipse", the type of event observed.
     :param models: dict. Dictionary containing every model for each slc.
     :param reses: dict. Dictionary containing every model's residuals for each slc.
     :param offset: float. The spacing between each plot. Should be roughly equal to the transit depth or a little bigger.
@@ -541,8 +592,8 @@ def plot_waterfall_fitres(timestamps, slc, slc_err, models, reses, offset=0.025)
     testres = [x for x in ress if str(x) != 'nan']
     ax0.set_ylim(min(testflx)-offset/6, max(testflx)+offset/6)
     ax1.set_ylim(min(testres)-offset/6, max(testres)+offset/6)
-    ax0.set_xlabel("time since mid-transit (days)")
-    ax1.set_xlabel("time since mid-transit (days)")
+    ax0.set_xlabel("time since mid-{} (days)".format(event_type))
+    ax1.set_xlabel("time since mid-{} (days)".format(event_type))
     ax0.set_ylabel("normalized flux (+offsets)")
     ax1.set_ylabel("normalized residuals (+offsets)")
     return fig, ax0, ax1
@@ -591,4 +642,9 @@ def compute_depth_aoverlap(theta, theta_err, exoplanet_params):
     err = (2*rp*(phi_1-0.5*np.sin(2 * phi_1))
            + rp_sq*dphi_1*(1-np.cos(2 * phi_1))
            + rs_sq*dphi_2*(1-np.cos(2 * phi_2)))*theta_err["rp"]
+    return depth, err
+
+def compute_depth_fpfs(theta, theta_err):
+    depth = theta["fp"]
+    err = theta_err["fp"]
     return depth, err

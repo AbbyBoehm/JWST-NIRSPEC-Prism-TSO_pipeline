@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 from . import utils
 
-def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
+def doStage5(filesdir, outdir, event_type, reject_threshold=3, raise_alarm=10,
              LSQfit_WLC={"do":True,
                          "exoplanet_params":{},
                          "systematics":(1,0),
@@ -67,6 +67,7 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
     Performs Stage 5 linear least-squares and MCMC fitting of the light curves in the specified directory.
     :param filesdir: str. Directory where the WLC and SLC files you want to fit to are stored, with wavelength files as information.
     :param outdir: str. Where to save all the outputs.
+    :param event_type" str. The type of event being fitted, which can be "transit" or "eclipse".
     :param LSQfit_WLC: dict of "do" bool, "exoplanet_params" dict, "systematics" tuple of float, "limb_darkening_model" dict, "fixed_param" dict, "priors_dict" dict, "priors_type" str, and "exoticLD" dict. Used to perform linear least-squares fitting on WLC to get system parameters out.
     :param MCMCit_WLC: dict of "do" bool, "exoplanet_params" dict, "systematics" tuple of float, "limb_darkening_model" dict, "fixed_param" dict, "priors_dict" dict, "priors_type" str, "exoticLD" dict, "N_walkers" int, "N_steps" int, and "est_err" float. Used to perform MCMC fitting on WLC to get system parameters out.
     :param LSQfit_spec: dict of "do" bool, "exoplanet_params" dict, "systematics" tuple of float, "limb_darkening_model" dict, "fixed_param" dict, "priors_dict" dict, "priors_type" str, and "exoticLD" dict. Used to perform linear least-squares fitting on SLCs to get estimate of depth and errors.
@@ -77,6 +78,14 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
 '''
     t0 = time.time()
     print("Beginning Stage 5 analysis...")
+    if event_type == "Transit":
+        event_type = "transit"
+    elif event_type == "Eclipse":
+        event_type = "eclipse"
+
+    while event_type not in ("transit", "eclipse"):
+        print("Juniper Stage 5 does recognize the supplied event_type ", event_type, " and cannot proceed.")
+        event_type = str(input('Allowed event_type inputs are "transit" and "eclipse". Specify event type:'))
     
     plotdir = os.path.join(outdir, "plots")
     textdir = os.path.join(outdir, "fits")
@@ -100,7 +109,7 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
         print("Performing linear least-squares fitting of WLC to extract revised estimates of system parameters...")
         exoticLD = LSQfit_WLC["exoticLD"]
         exoticLD["spectral_range"] = (wavmin*10**4, wavmax*10**4) # need to update the spectral_range key, in AA.
-        fit_theta, fit_corr_bat_lc, interp_t, residuals, err = LSQfit(timestamps, wlc,
+        fit_theta, fit_corr_bat_lc, interp_t, residuals, err = LSQfit(timestamps, wlc, event_type,
                                                                       exoplanet_params=LSQfit_WLC["exoplanet_params"],
                                                                       systematics=LSQfit_WLC["systematics"],
                                                                       limb_darkening_model=LSQfit_WLC["limb_darkening_model"],
@@ -120,6 +129,7 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
         # Write results of fit to .txt file.
         dummy_dict = {}
         dummy_dict["rp"] = 0
+        dummy_dict["fp"] = 0
         utils.write_run_to_text(outdir=textdir,
                                 outfile="LSQfit_fit_WLC.txt",
                                 fit_theta=fit_theta,
@@ -137,7 +147,11 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
         # Update exoplanet_params based on LSQfit information.
         parameters_to_update = fit_theta.keys()
         for key in parameters_to_update:
-            MCMCfit_WLC["exoplanet_params"][key] = fit_theta[key]
+            if key in ("a1","a2"):
+                pass
+            else:
+                MCMCfit_WLC["exoplanet_params"][key] = fit_theta[key]
+        MCMCfit_WLC["systematics"] = (fit_theta["a1"],fit_theta["a2"])
     
     if MCMCfit_WLC["do"]:
         print("Performing Markov Chain Monte Carlo fitting of WLC to extract system parameters with estimated uncertainties...")
@@ -149,7 +163,7 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
             wlc_err = np.array([err for i in timestamps])
         except:
             wlc_err = np.array([MCMCfit_WLC["est_err"] for i in timestamps])
-        theta, theta_err, err, plotting_items = MCMCfit(timestamps, wlc, wlc_err,
+        theta, theta_err, err, plotting_items = MCMCfit(timestamps, wlc, wlc_err, event_type,
                                                         exoplanet_params=MCMCfit_WLC["exoplanet_params"],
                                                         systematics=MCMCfit_WLC["systematics"],
                                                         limb_darkening_model=MCMCfit_WLC["limb_darkening_model"],
@@ -204,8 +218,13 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
         # Update exoplanet_params based on MCMCfit information.
         parameters_to_update = theta.keys()
         for key in parameters_to_update:
-            LSQfit_spec["exoplanet_params"][key] = theta[key]
-            MCMCfit_spec["exoplanet_params"][key] = theta[key]
+            if key in ("a1","a2"):
+                pass
+            else:
+                LSQfit_spec["exoplanet_params"][key] = theta[key]
+                MCMCfit_spec["exoplanet_params"][key] = theta[key]
+        LSQfit_spec["systematics"] = (theta["a1"],theta["a2"])
+        MCMCfit_spec["systematics"] = (theta["a1"],theta["a2"])
     
     if (LSQfit_spec["do"] or MCMCfit_spec["do"]):
         # Get the arrays needed to do fitting.
@@ -237,7 +256,7 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
             exoticLD = LSQfit_spec["exoticLD"]
             exoticLD["spectral_range"] = (wavelengths[l][0]*10**4, wavelengths[l][1]*10**4) # need to update the spectral_range key, in AA.
             try:
-                fit_theta, fit_corr_bat_lc, interp_t, residuals, err = LSQfit(timestamps[l], slc[l],
+                fit_theta, fit_corr_bat_lc, interp_t, residuals, err = LSQfit(timestamps[l], slc[l], event_type,
                                                                             exoplanet_params=LSQfit_spec["exoplanet_params"],
                                                                             systematics=LSQfit_spec["systematics"],
                                                                             limb_darkening_model=LSQfit_spec["limb_darkening_model"],
@@ -266,6 +285,7 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
                 # Write results of fit to .txt file.
                 dummy_dict = {}
                 dummy_dict["rp"] = 0
+                dummy_dict["fp"] = 0
                 utils.write_run_to_text(outdir=textdir,
                                         outfile="LSQfit_fit_SLC_%.3fmu.txt" % wavelength,
                                         fit_theta=fit_theta,
@@ -310,7 +330,7 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
                 except:
                     slc_err = np.array([MCMCfit_spec["est_err"] for i in timestamps[l]])
                 try:
-                    theta, theta_err, err, plotting_items = MCMCfit(timestamps[l], slc[l], slc_err,
+                    theta, theta_err, err, plotting_items = MCMCfit(timestamps[l], slc[l], slc_err, event_type,
                                                                     exoplanet_params=MCMCfit_spec["exoplanet_params"],
                                                                     systematics=MCMCfit_spec["systematics"],
                                                                     limb_darkening_model=MCMCfit_spec["limb_darkening_model"],
@@ -372,59 +392,84 @@ def doStage5(filesdir, outdir, reject_threshold=3, raise_alarm=10,
                                         N_steps=MCMCfit_spec["N_steps"],
                                         exoticLD=exoticLD)
         
-        for depth_type in ("rprs","rprs2","aoverlap"):
-            # Write spectrum out.
-            wavelengths, depths, depth_errs = utils.get_transit_spectrum(MCMC_thetas, MCMC_thetaerrs, MCMC_SDNRs,
-                                                                         exoplanet_params=MCMCfit_spec["exoplanet_params"],
-                                                                         depth_type=depth_type, ignore_high_SDNR=False)
-            outfile = "MCMC_spectrum_{}.txt".format(depth_type)
-            utils.write_transit_spectrum(specdir, outfile, wavelengths, depths, depth_errs)
-            if save_plots["do"]:
-                if not os.path.exists(plotdir):
-                    os.makedirs(plotdir)
-                if save_plots["spectrum"]:
-                    fig, axes = utils.plot_transit_spectrum(wavelengths, depths, depth_errs,
-                                                            reference_wavelengths=reference_spectra["reference_wavelengths"],
-                                                            reference_depths=reference_spectra["reference_depths"],
-                                                            reference_errs=reference_spectra["reference_errs"],
-                                                            reference_names=reference_spectra["reference_names"],
-                                                            ylim=(0.95*min(depths),1.05*max(depths)))
-                    plt.savefig(os.path.join(plotdir, "transit_spectrum_{}.pdf".format(depth_type)), bbox_inches="tight")
-                    plt.close()
-                fig, axes = utils.plot_SDNRs(SDNRs=MCMC_SDNRs)
-                plt.savefig(os.path.join(plotdir, "transit_fit_residuals.pdf"), bbox_inches="tight")
-                plt.close()
-            # Compute final transit spectrum with chosen depths ignored.
-            for limit in []:
-                print("On SDNR limit {}...".format(limit))
-                wavelengths, depths, depth_errs = utils.get_transit_spectrum(MCMC_thetas, MCMC_thetaerrs, MCMC_SDNRs,
-                                                                             exoplanet_params=MCMCfit_spec["exoplanet_params"],
-                                                                             depth_type=depth_type, ignore_high_SDNR=True,
-                                                                             SDNRlimit=limit)
-                try:
-                    outfile = "MCMC_spectrum{}ppm_{}.txt".format(limit, depth_type)
-                    utils.write_transit_spectrum(specdir, outfile, wavelengths, depths, depth_errs)
-
-                    print("Depth spectrum:")
-                    print([float(x) for x in depths])
-                    if save_plots["do"]:
-                        if not os.path.exists(plotdir):
-                            os.makedirs(plotdir)
-                        if save_plots["spectrum"]:
+        for depth_type in ("rprs","rprs2","aoverlap","fpfs"):
+            if (depth_type == "fpfs" and event_type != "eclipse"):
+                pass
+            elif (depth_type != "fpfs" and event_type == "eclipse"):
+                pass
+            else:
+                # Write spectrum out.
+                wavelengths, depths, depth_errs = utils.get_spectrum(MCMC_thetas, MCMC_thetaerrs, MCMC_SDNRs,
+                                                                            exoplanet_params=MCMCfit_spec["exoplanet_params"],
+                                                                            depth_type=depth_type, ignore_high_SDNR=False)
+                outfile = "MCMC_spectrum_{}.txt".format(depth_type)
+                utils.write_spectrum(specdir, outfile, wavelengths, depths, depth_errs)
+                if save_plots["do"]:
+                    if not os.path.exists(plotdir):
+                        os.makedirs(plotdir)
+                    if save_plots["spectrum"]:
+                        if depth_type != "fpfs":
                             fig, axes = utils.plot_transit_spectrum(wavelengths, depths, depth_errs,
                                                                     reference_wavelengths=reference_spectra["reference_wavelengths"],
                                                                     reference_depths=reference_spectra["reference_depths"],
                                                                     reference_errs=reference_spectra["reference_errs"],
                                                                     reference_names=reference_spectra["reference_names"],
                                                                     ylim=(0.95*min(depths),1.05*max(depths)))
-                            plt.savefig(os.path.join(plotdir, "transit_spectrum{}ppm_{}.pdf".format(limit, depth_type)), bbox_inches="tight")
+                            plt.savefig(os.path.join(plotdir, "transit_spectrum_{}.pdf".format(depth_type)), bbox_inches="tight")
                             plt.close()
-                except ZeroDivisionError:
-                    print("Spectrum cannot be plotted as it has nans!")
+                        else:
+                            fig, axes = utils.plot_eclipse_spectrum(wavelengths, depths, depth_errs,
+                                                                    reference_wavelengths=reference_spectra["reference_wavelengths"],
+                                                                    reference_depths=reference_spectra["reference_depths"],
+                                                                    reference_errs=reference_spectra["reference_errs"],
+                                                                    reference_names=reference_spectra["reference_names"],
+                                                                    ylim=(0.95*min(depths),1.05*max(depths)))
+                            plt.savefig(os.path.join(plotdir, "eclipse_spectrum_{}.pdf".format(depth_type)), bbox_inches="tight")
+                            plt.close()
+                    fig, axes = utils.plot_SDNRs(SDNRs=MCMC_SDNRs)
+                    plt.savefig(os.path.join(plotdir, "{}_fit_residuals.pdf".format(event_type)), bbox_inches="tight")
+                    plt.close()
+                # Compute final transit spectrum with chosen depths ignored.
+                for limit in []:
+                    print("On SDNR limit {}...".format(limit))
+                    wavelengths, depths, depth_errs = utils.get_spectrum(MCMC_thetas, MCMC_thetaerrs, MCMC_SDNRs,
+                                                                                exoplanet_params=MCMCfit_spec["exoplanet_params"],
+                                                                                depth_type=depth_type, ignore_high_SDNR=True,
+                                                                                SDNRlimit=limit)
                     try:
-                        plt.close()
-                    except:
-                        pass
+                        outfile = "MCMC_spectrum{}ppm_{}.txt".format(limit, depth_type)
+                        utils.write_spectrum(specdir, outfile, wavelengths, depths, depth_errs)
+
+                        print("Depth spectrum:")
+                        print([float(x) for x in depths])
+                        if save_plots["do"]:
+                            if not os.path.exists(plotdir):
+                                os.makedirs(plotdir)
+                            if save_plots["spectrum"]:
+                                if depth_type != "fpfs":
+                                    fig, axes = utils.plot_transit_spectrum(wavelengths, depths, depth_errs,
+                                                                            reference_wavelengths=reference_spectra["reference_wavelengths"],
+                                                                            reference_depths=reference_spectra["reference_depths"],
+                                                                            reference_errs=reference_spectra["reference_errs"],
+                                                                            reference_names=reference_spectra["reference_names"],
+                                                                            ylim=(0.95*min(depths),1.05*max(depths)))
+                                    plt.savefig(os.path.join(plotdir, "transit_spectrum{}ppm_{}.pdf".format(limit, depth_type)), bbox_inches="tight")
+                                    plt.close()
+                                else:
+                                    fig, axes = utils.plot_eclipse_spectrum(wavelengths, depths, depth_errs,
+                                                                            reference_wavelengths=reference_spectra["reference_wavelengths"],
+                                                                            reference_depths=reference_spectra["reference_depths"],
+                                                                            reference_errs=reference_spectra["reference_errs"],
+                                                                            reference_names=reference_spectra["reference_names"],
+                                                                            ylim=(0.50*min(depths),1.50*max(depths)))
+                                    plt.savefig(os.path.join(plotdir, "eclipse_spectrum{}ppm_{}.pdf".format(limit, depth_type)), bbox_inches="tight")
+                                    plt.close()
+                    except ZeroDivisionError:
+                        print("Spectrum cannot be plotted as it has nans!")
+                        try:
+                            plt.close()
+                        except:
+                            pass
     
     tf = time.time() - t0
     print("Stage 5 analysis resolved in %.3f seconds = %.3f minutes." % (tf, tf/60))
@@ -447,7 +492,7 @@ def read_light_curve(filepath):
                 line = str.split(line)#, sep='   ')
                 
                 # Extract useful info.
-                time = float(line[0]) # time in days relative to mid-transit
+                time = float(line[0]) # time in days relative to mid-transit or mid-eclipse
                 flux = float(str.replace(line[1],'\n','')) # normalized flux
                 
                 t.append(time)
@@ -483,12 +528,13 @@ def read_wvs(filepath):
     wavmin, wavmax, central_lam = items
     return wavmin, wavmax, central_lam
 
-def LSQfit(t, lc, exoplanet_params, systematics, limb_darkening_model, fixed_param, priors_dict, priors_type, exoticLD, reject_threshold=None):
+def LSQfit(t, lc, event_type, exoplanet_params, systematics, limb_darkening_model, fixed_param, priors_dict, priors_type, exoticLD, reject_threshold=None):
     '''
     Performs linear least-squares fit of transit model to provided light curve.
 
     :param t: 1D array. Timestamps for each flux point in the array.
     :param lc: 1D array. A light curve to fit a model to.
+    :param event_type: str. "transit" or "eclipse".
     :param exoplanet_params: dict of float. Contains keywords "t0", "period", "rp", "aoR", "inc", "ecc", "lop".
     :param systematics: tuple of float. Contains parameters (a1, a2) for a linear-in-time fit sys(t) = a1*t+a2.
     :param limb_darkening_model: dict. Contains "model_type" str which defines model choice (e.g. quadratic, 4-param), "stellar_params" tuple of (M_H, Teff, logg) or None if not using, "coefficients" keyword containing tuple of floats which can be fixed or fitted for (in the latter case, "coefficients" defines the starting guess). If LD is supplied by exotic, "coefficients" is ignored.
@@ -521,7 +567,7 @@ def LSQfit(t, lc, exoplanet_params, systematics, limb_darkening_model, fixed_par
         using_kipping = False
     
     print("Using ld coeffs initial guess: ", exoplanet_params["LD_coeffs"])
-    residuals, trimmed_residuals, theta_guess, fit_theta, fit_corr_bat_lc, interp_t = lsqfit(exoplanet_params, fixed_param, priors_dict,
+    residuals, trimmed_residuals, theta_guess, fit_theta, fit_corr_bat_lc, interp_t = lsqfit(event_type, exoplanet_params, fixed_param, priors_dict,
                                                                                              a1, a2, t, lc, using_kipping, priors_type, reject_threshold)
     
     if trimmed_residuals is not None:
@@ -533,10 +579,11 @@ def LSQfit(t, lc, exoplanet_params, systematics, limb_darkening_model, fixed_par
     
     return fit_theta, fit_corr_bat_lc, interp_t, residuals, err
 
-def lsqfit(exoplanet_params, fixed_param, priors_dict, a1, a2, t, lc, using_kipping, priors_type, reject_threshold=None):
+def lsqfit(event_type, exoplanet_params, fixed_param, priors_dict, a1, a2, t, lc, using_kipping, priors_type, reject_threshold=None):
     '''
     Invokes least-squares fitting and handles outputs for the LSQfit.do() routine.
 
+    :param event_type: str. "transit" or "eclipse". Needed for initializing the correct batman model.
     :param exoplanet_params: dict of float. Contains keywords "t0", "period", "rp", "aoR", "inc", "ecc", "lop".
     :param fixed_param. dict of bools. Keywords are parameters that can be held fixed or opened for fitting. If True, parameter will be held fixed. If False, parameter is allowed to be fitted.
     :param priors_dict: dict of tup of float. Keywords are parameters. Defines the min and max value that LSQfit can return for the given parameter.
@@ -549,14 +596,15 @@ def lsqfit(exoplanet_params, fixed_param, priors_dict, a1, a2, t, lc, using_kipp
     :return: 1D array of residuals to the best fit, dict of theta_guess initial guess, dict of fit_theta solution, 1D array fit_corr_bat_lc of the fitted model, 1D of the interpolated time for plotting purposes.
     '''
     # Initialize batman model.
-    params = utils.initialize_batman_params(exoplanet_params)
+    params = utils.initialize_batman_params(exoplanet_params, event_type)
     
-    m = batman.TransitModel(params, t)                       #initializes model
-    f = m.light_curve(params)                                #calculates light curve
-    init_bat_model = batman.TransitModel(params, t)
+    if event_type == "transit":
+        init_bat_model = batman.TransitModel(params, t)
+    elif event_type == "eclipse":
+        init_bat_model = batman.TransitModel(params, t, transittype="secondary")
     
     # Initialize guess dictionary.
-    theta_guess = utils.build_theta_dict(a1, a2, params.rp, exoplanet_params, fixed_param)
+    theta_guess = utils.build_theta_dict(a1, a2, exoplanet_params, fixed_param)
 
     # Commence fitting using fit_model routine.
     fit_theta, fit_theta_arr, modified_keys, fit_corr_bat_lc = fit_model(theta_guess, init_bat_model,
@@ -567,9 +615,10 @@ def lsqfit(exoplanet_params, fixed_param, priors_dict, a1, a2, t, lc, using_kipp
                            modified_keys, init_bat_model, params, t, lc, using_kipping)
     if reject_threshold is not None:
         trimmed_lc, trimmed_t, n_reject = reject_outliers(np.copy(t), np.copy(lc), residuals, sigma=reject_threshold, raise_alarm=10)
-        m = batman.TransitModel(params, trimmed_t)                       #initializes model
-        f = m.light_curve(params)                                        #calculates light curve
-        init_bat_model = batman.TransitModel(params, trimmed_t)
+        if event_type == "transit":
+            init_bat_model = batman.TransitModel(params, trimmed_t)
+        elif event_type == "eclipse":
+            init_bat_model = batman.TransitModel(params, trimmed_t, transittype="secondary")
         trimmed_residuals = residuals_(fit_theta_arr, fit_theta,
                                        modified_keys, init_bat_model, params, trimmed_t, trimmed_lc, using_kipping)
     else:
@@ -577,9 +626,12 @@ def lsqfit(exoplanet_params, fixed_param, priors_dict, a1, a2, t, lc, using_kipp
     
     # Compute a higher time resolution version of fit_corr_bat_lc for plotting puproses.
     interp_t = np.linspace(np.min(t),np.max(t),1000)
-    m = batman.TransitModel(params, interp_t)
+    if event_type == "transit":
+        init_bat_model = batman.TransitModel(params, interp_t)
+    elif event_type == "eclipse":
+        init_bat_model = batman.TransitModel(params, interp_t, transittype="secondary")
     polyfit = fit_theta["a1"]*interp_t + fit_theta["a2"]
-    fit_corr_bat_lc = m.light_curve(params)*polyfit
+    fit_corr_bat_lc = init_bat_model.light_curve(params)*polyfit
     return residuals, trimmed_residuals, theta_guess, fit_theta, fit_corr_bat_lc, interp_t
 
 def fit_model(theta_guess, init_bat_model, params, t, lc, priors_dict, using_kipping, priors_type):
@@ -681,13 +733,14 @@ def modify_model(theta, init_bat_model, params, t):
     
     return full_bat_model
 
-def MCMCfit(t, lc, err, exoplanet_params, systematics, limb_darkening_model, fixed_param, priors_dict, exoticLD, priors_type="uniform", N_walkers = 32, N_steps = 5000):
+def MCMCfit(t, lc, err, event_type, exoplanet_params, systematics, limb_darkening_model, fixed_param, priors_dict, exoticLD, priors_type="uniform", N_walkers = 32, N_steps = 5000):
     '''
     Performs Markov Chain Monte Carlo fit of transit model to provided light curve.
 
     :param t: 1D array. Timestamps for each flux point in the array.
     :param lc: 1D array. A light curve to fit a model to.
     :param err: 1D array. The uncertainty on each lc point.
+    :param event_type: str. "transit" or "eclipse".
     :param exoplanet_params: dict of float. Contains keywords "t0", "period", "rp", "aoR", "inc", "ecc", "lop".
     :param systematics: tuple of float. Contains parameters (a1, a2) for a linear-in-time fit sys(t) = a1*t+a2.
     :param limb_darkening_model: dict. Contains "model_type" str which defines model choice (e.g. quadratic, 4-param), "stellar_params" tuple of (M_H, Teff, logg) or None if not using, "coefficients" keyword containing tuple of floats which can be fixed or fitted for (in the latter case, "coefficients" defines the starting guess). If LD is supplied by exotic, "coefficients" is ignored.
@@ -723,13 +776,16 @@ def MCMCfit(t, lc, err, exoplanet_params, systematics, limb_darkening_model, fix
     print("Using ld coeffs initial guess: ", exoplanet_params["LD_coeffs"])
 
     # Set up params for batman
-    params = utils.initialize_batman_params(exoplanet_params)
+    params = utils.initialize_batman_params(exoplanet_params, event_type)
     
     # Initialize model.
-    bat_model = batman.TransitModel(params, t)
+    if event_type == "transit":
+        bat_model = batman.TransitModel(params, t)
+    elif event_type == "eclipse":
+        bat_model = batman.TransitModel(params, t, transittype="secondary")
 
     # Initialize the guess.
-    theta_guess = utils.build_theta_dict(a1, a2, params.rp, exoplanet_params, fixed_param)
+    theta_guess = utils.build_theta_dict(a1, a2, exoplanet_params, fixed_param)
         
     # Convert the guess into an array.
     theta_arr, modified_keys = utils.turn_dict_to_array(theta_guess)
@@ -755,22 +811,28 @@ def MCMCfit(t, lc, err, exoplanet_params, systematics, limb_darkening_model, fix
     theta_err = utils.turn_array_to_dict(modified_keys, theta_err)
     
     # Reinitialize model.
-    params = utils.initialize_batman_params(exoplanet_params)
+    params = utils.initialize_batman_params(exoplanet_params, event_type)
     
     # Replace default params with fitted params as applicable.
     a1, a2, params = utils.update_params(theta, params)
     
-    m = batman.TransitModel(params, t)    #initializes model
+    if event_type == "transit":
+        bat_model = batman.TransitModel(params, t)
+    elif event_type == "eclipse":
+        bat_model = batman.TransitModel(params, t, transittype="secondary")
     polyfit= a1*t + a2
-    model = m.light_curve(params)*polyfit
+    model = bat_model.light_curve(params)*polyfit
 
     residuals = lc - model
 
     # Compute a higher time resolution version of model for plotting puproses.
     interp_t = np.linspace(np.min(t),np.max(t),1000)
-    m = batman.TransitModel(params, interp_t)
+    if event_type == "transit":
+        bat_model = batman.TransitModel(params, interp_t)
+    elif event_type == "eclipse":
+        bat_model = batman.TransitModel(params, interp_t, transittype="secondary")
     polyfit = a1*interp_t + a2
-    model = m.light_curve(params)*polyfit
+    model = bat_model.light_curve(params)*polyfit
 
     plotting_items = (ndim, samples, flat_samples, labels, n, model, residuals, interp_t)
     err = np.std(residuals)
@@ -810,7 +872,10 @@ def log_prior(theta, modified_keys, params, priors_dict, priors_type, using_kipp
     
     a1 = theta_dict["a1"]
     a2 = theta_dict["a2"]
-    params.rp = theta_dict["rp"]
+    #if "rp" in list(theta_dict.keys()):
+    #    params.rp = theta_dict["rp"]
+    #if "fp" in list(theta_dict.keys()):
+    #    params.fp = theta_dict["fp"]
     try:
         LD_coeffs = theta_dict["LD_coeffs"]
     except:
@@ -824,9 +889,13 @@ def log_prior(theta, modified_keys, params, priors_dict, priors_type, using_kipp
         
     if not -5 < a2 < 5:
         checks_on_posteriors.append("F")
-        
-    if  not 0.01 < theta_dict["rp"] < 100:
-        checks_on_posteriors.append("F")
+    
+    if "rp" in theta_dict.keys():
+        if not 0.001 < theta_dict["rp"] < 100:
+            checks_on_posteriors.append("F")
+    if "fp" in theta_dict.keys():
+        if not 0 < theta_dict["fp"] < 100:
+            checks_on_posteriors.append("F")
     
     if using_kipping:
         umin, umax = (0, 1)
@@ -840,7 +909,7 @@ def log_prior(theta, modified_keys, params, priors_dict, priors_type, using_kipp
             if not umin <= u <= umax:
                 checks_on_posteriors.append("F")
 
-    for key in ("ecc","period","inc","lop","aoR","t0"):
+    for key in ("ecc","period","inc","lop","aoR","t0","t_secondary"):
         if key in modified_keys:
             if priors_type == "uniform":
                 if not priors_dict[key][0] <= theta_dict[key] <= priors_dict[key][1]:

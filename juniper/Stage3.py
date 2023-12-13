@@ -154,7 +154,7 @@ def doStage3(filesdir, outdir,
     
     print("Stage 3 calibrations completed in %.3f minutes." % ((time.time()-t0)/60))
     
-    print("Writing calibrated fits file as several .fits file...")
+    print("Writing calibrated fits file as several .fits files...")
     for i, file in enumerate(files):
         outfile = os.path.join(outdir, "postprocessed_{0:g}.fits".format(i))
         shutil.copy(file,outfile)
