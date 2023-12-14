@@ -9,7 +9,7 @@ This is a test script that demos an execution of the Juniper module.
 The way this script is organised is also a handy way for you to organise your own script!
 '''
 ### OKAY, LET'S GET TO IT ###
-target = 'WASP-39b'
+target = 'WASP-52b'
 
 if target == 'WD1856b':
     # The event type, "transit" or "eclipse".
@@ -67,7 +67,7 @@ if target == 'WASP-39b':
     # The event type, "transit" or "eclipse".
     event_type = "transit"
     # The locations of the data files.
-    selecting_for = 'nrs1'
+    selecting_for = 'nrs2'
     stage1_filepaths = []
     stage1_outfiles = []
     dirs = os.listdir('/Users/abby/opt/anaconda3/github_repos/juniper/tests/WASP39_ERS')
@@ -187,11 +187,11 @@ if target == 'WASP-52b':
                 "custom_model_path":None,
                 "ld_interpolate_type":'trilinear'}
 
-fixed_param_WLC = {"rp":False,
-                   "fp":True,
+fixed_param_WLC = {"rp":True,
+                   "fp":False,
                    "LD_coeffs":True,
-                   "t0":False,
-                   "t_secondary":True,
+                   "t0":True,
+                   "t_secondary":False,
                    "period":True,
                    "aoR":False,
                    "inc":False,
@@ -199,8 +199,8 @@ fixed_param_WLC = {"rp":False,
                    "lop":True,
                    "offset":True}
 
-fixed_param_SLC = {"rp":False,
-                   "fp":True,
+fixed_param_SLC = {"rp":True,
+                   "fp":False,
                    "LD_coeffs":True,
                    "t0":True,
                    "t_secondary":True,
@@ -213,12 +213,12 @@ fixed_param_SLC = {"rp":False,
 
 print("Operating on target {}...".format(target))
 
-stage1 = {"skip":False,
+stage1 = {"skip":True,
           "filepaths":stage1_filepaths,
           "outfiles":stage1_outfiles,
           "outdir":stage1_outdir}
 
-stage2 = {"skip":False,
+stage2 = {"skip":True,
           "filesdir":stage2_filesdir,
           "outfiles":stage2_outfiles,
           "outdir":stage2_outdir}
@@ -231,7 +231,7 @@ stage4 = {"skip":True,
           "filesdir":stage4_filesdir,
           "outdir":stage4_outdir}
 
-stage5 = {"skip":True,
+stage5 = {"skip":False,
           "filesdir":stage5_filesdir,
           "outdir":stage5_outdir,
           "exoplanet_params":exoplanet_params}
@@ -302,7 +302,7 @@ if not stage4["skip"]:
                                                      "event_type":event_type},
                             sigma_clip_curves={"skip":False,
                                                 "b":100,
-                                                "clip_at":3},
+                                                "clip_at":5},
                             fix_mirror_tilts={"skip":False,
                                               "threshold":0.002,
                                               "known_index":270},

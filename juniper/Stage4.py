@@ -193,6 +193,7 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
         plt.title("Where standard deviation is unexpectedly high")
         plt.xlabel("column #")
         plt.ylabel("abs(median filtered - true std dev)")
+        plt.ylim(0,0.2)
         plt.show()
         plt.close()
         change = int(input("Change threshold? Yes (1) or no (0): "))

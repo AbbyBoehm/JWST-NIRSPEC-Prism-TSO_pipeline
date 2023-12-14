@@ -112,7 +112,7 @@ def get_rolls(frame):
     # From Eureka! S3 straighten.py code.
     # Determine the rolls needed to straighten the trace using the median frame.
     pix_centers = np.arange(frame.shape[0]) + 0.5
-    COMs = signal.medfilt((np.sum(pix_centers[:,np.newaxis]*frame,axis=0)/np.sum(frame,axis=0)),7)
+    COMs = signal.medfilt((np.sum(pix_centers[:,np.newaxis]*np.abs(frame),axis=0)/np.sum(np.abs(frame),axis=0)),7)
     integer_COMs = np.around(COMs - 0.5).astype(int)
     new_center = int(frame.shape[0]/2) - 1
     rolls = new_center - integer_COMs
