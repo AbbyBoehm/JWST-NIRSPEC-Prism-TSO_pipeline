@@ -1,6 +1,5 @@
 import os
 import glob
-import shutil
 
 import numpy as np
 import time
@@ -61,7 +60,7 @@ def doStage2(filesdir, outfiles, outdir,
         output_file = os.path.join(outdir, outfile+"_calints.fits")
         with fits.open(output_file) as file:
             grating = file[0].header['GRATING']
-            if grating == "G395H":
+            if grating in ("G395M","G395H"):
                 print("{} grating detected, correcting for trace curvature...".format(grating))
                 scidata = file['SCI'].data
                 wavelengths = file['WAVELENGTH'].data
@@ -118,7 +117,7 @@ def get_rolls(frame):
     rolls = new_center - integer_COMs
     rolls[COMs<0] = 0
     rolls[COMs>frame.shape[0]] = 0
-    rolls = signal.medfilt(rolls,5)
+    rolls = signal.medfilt(rolls,41)
     return rolls
 
 def write_curve_fixed_file(output_file, shifted_scidata, shifted_wavelengths):

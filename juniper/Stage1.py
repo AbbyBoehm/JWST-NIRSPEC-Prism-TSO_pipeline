@@ -5,6 +5,7 @@ import time
 
 import matplotlib.pyplot as plt
 from scipy import signal
+from scipy.optimize import least_squares
 from astropy.stats import sigma_clip
 
 from jwst.pipeline import Detector1Pipeline
@@ -103,12 +104,45 @@ def one_over_f_subtraction(data, bckg_rows, bckg_kernel, bckg_sigma, show):
     '''
     # Time this step.
     t0 = time.time()
+
+    # If the background region is too small, this section and setting bckg_rows == 'all'
+    # gives you the option to model the background by using Moffats to remove the trace.
+    moffat_model = False
+    if bckg_rows == 'all':
+        print("You have requested that the entire frame be used for background subtraction.\nWe will now try to fit Moffats to every column to remove the trace\nand reconstruct the background with the trace removed.")
+        moffat_model = True
+        bckg_rows = [0,1,2,3,4,5,-1,-2,-3,-4,-5,-6]
+        background_model = np.copy(data)
+        for i in range(np.shape(data)[0]): # for each integration
+            for g in range(np.shape(data)[1]): # for each group
+                t_moffat = time.time()
+                background_model[i,g,:,:] = clean(background_model[i,g,:,:], bckg_sigma, bckg_kernel) # remove CRs before performing the fit.
+                moffat_of_this_frame = moffat_frame(background_model[i,g,:,:])
+                background_model[i,g,:,:] = background_model[i,g,:,:] - moffat_of_this_frame # fit Moffats to every column and then remove them from the image to leave the background behind.
+
+                if (i == 0 and g == 0 and show):
+                    plt.imshow(moffat_of_this_frame)
+                    plt.title("Moffat model of the 0th frame of the 0th group\nproduced in {:.2f} seconds".format(time.time()-t_moffat))
+                    plt.show()
+                    plt.close()
+            if (i%1000 == 0 and i != 0):
+                # Report every 1000 integrations.
+                elapsed_time = time.time()-t0
+                iterrate = i/elapsed_time
+                iterremain = np.shape(data)[0] - i
+                print("On integration %.0f. Elapsed time in background modelling step is %.3f seconds." % (i, elapsed_time))
+                print("Average rate of integration processing: %.3f ints/s." % iterrate)
+                print("Estimated time remaining to background model completion: %.3f seconds.\n" % (iterremain/iterrate))
+        print("Built background model. Resuming background subtraction...")
+
     for i in range(np.shape(data)[0]): # for each integration
         for g in range(np.shape(data)[1]): # for each group
-            # Define the background region.
-            background_region = data[i, g, bckg_rows, :]
+            # Define the background region.    
+            background_region = np.copy(data[i, g, bckg_rows, :])
+            
             if (i == 0 and g == 0 and show):
                 fig, ax, im = img(np.log10(np.abs(background_region)), aspect=5, vmin=None, vmax=None, norm=None)
+                plt.colorbar(im)
                 plt.show()
                 plt.close()
             
@@ -116,19 +150,41 @@ def one_over_f_subtraction(data, bckg_rows, bckg_kernel, bckg_sigma, show):
             background_region = clean(background_region, bckg_sigma, bckg_kernel)
             if (i == 0 and g == 0 and show):
                 fig, ax, im = img(np.log10(np.abs(background_region)), aspect=5, vmin=None, vmax=None, norm=None)
+                plt.colorbar(im)
                 plt.show()
                 plt.close()
             
             # Define the mean background in each column and extend to a full-size array.
-            background = background_region.mean(axis=0)
+            #background = background_region.mean(axis=0)
+            background = np.median(background_region,axis=0)
             background = np.array([background,]*np.shape(data)[2])
             if (i == 0 and g == 0 and show):
                 fig, ax, im = img(np.log10(np.abs(background)), aspect=5, vmin=None, vmax=None, norm=None)
+                plt.colorbar(im)
                 plt.show()
                 plt.close()
 
             if (i == 0 and g == 0 and show):
                 fig, ax, im = img(np.log10(np.abs(data[i, g, :, :])), aspect=5, vmin=None, vmax=None, norm=None)
+                plt.colorbar(im)
+                plt.show()
+                plt.close()
+
+            if moffat_model:
+                plt.imshow(background, vmin=np.min(background), vmax=np.max(background))
+                plt.colorbar()
+                plt.title("Conventionally-extracted background using top and bottom row of array")
+                plt.show()
+                plt.close()
+
+                background_region = background_model[i, g, :, :]
+                background_region = clean(background_region, bckg_sigma, bckg_kernel)
+                background = background_region.mean(axis=0)
+                background = np.array([background,]*np.shape(data)[2])
+
+                plt.imshow(background, vmin=np.min(background), vmax=np.max(background))
+                plt.colorbar()
+                plt.title("Modelled background")
                 plt.show()
                 plt.close()
 
@@ -138,6 +194,8 @@ def one_over_f_subtraction(data, bckg_rows, bckg_kernel, bckg_sigma, show):
                 fig, ax, im = img(np.log10(np.abs(data[i, g, :, :])), aspect=5, vmin=None, vmax=None, norm=None)
                 plt.show()
                 plt.close()
+
+            del(background_region) # recover memory
                 
         if (i%1000 == 0 and i != 0):
             # Report every 1000 integrations.
@@ -167,3 +225,42 @@ def clean(data, sigma, kernel):
     int_mask = mask.astype(float) * medfilt
     test = (~mask).astype(float)
     return (data*test) + int_mask
+
+def moffat_frame(frame):
+    # Initialize frame model as list.
+    P = []
+    
+    # Iterate on columns.
+    for i in range(frame.shape[1]):
+        # Grab column to fit.
+        col = frame[:,i]
+        x = np.array([k for k in range(col.shape[0])])
+        # Fit the Moffat profile.
+        params = (0, max(col), int(col.shape[0]/2), 1.25, -1.25)
+        lb = max(col)*0.99
+        ub = max(col)*1.01
+        if max(col) < 0:
+            lb = max(col)*1.01
+            ub = max(col)*0.99
+        if max(col) == 0:
+            lb = -1e6
+            ub = 1e6
+        lower_bounds = (-1e6, lb, 0, 1.00, -1.50)
+        upper_bounds = (1e6, ub, int(col.shape[0]), 1.50, -1.00)
+        opt_result = least_squares(leastsq_input_function, params, bounds=(lower_bounds, upper_bounds), args=(x, col))
+        C, c, mu, G, alpha = opt_result.x
+        C = 0 # C is effectively the background level, so you *don't* want to subtract it out at this stage.
+        moffat_profile = moffat(x, C, c, mu, G, alpha)
+
+        # Append Moffat profile.
+        P.append(moffat_profile)
+    return np.array(P).T
+
+def moffat(x, C, c, mu, G, alpha):
+    r = (x-mu)/G
+    return c*((1+r**2)**alpha) + C
+
+def leastsq_input_function(params, x, profile):
+    C, c, mu, G, alpha = params
+    fit = moffat(x, C, c, mu, G, alpha)
+    return (fit - profile)

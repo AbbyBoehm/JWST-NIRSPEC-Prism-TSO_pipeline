@@ -138,7 +138,7 @@ def doStage3(filesdir, outdir,
                     num_pixels_masked_NaN += len(segments[:,i,j])
             except IndexError:
                 pass
-    print("Identified and masked {} NaN pixels in the trace.".format(num_pixels_masked_NaN))
+    print("Identified and masked {} untreated NaN pixels in the trace.".format(num_pixels_masked_NaN))
 
     if not track_source_location["skip"]:
         frames_rejected_by_source_motion = gaussian_source_track(segments,
@@ -151,8 +151,6 @@ def doStage3(filesdir, outdir,
     totalmasked = num_pixels_lost_by_flagging + num_pixels_lost_by_iteration + num_pixels_lost_by_filtering + num_pixels_lost_by_laplacian + num_pixels_masked_NaN
     total = np.shape(segments)[0]*(trace_aperture["vcut2"]-trace_aperture["vcut1"])*(trace_aperture["hcut2"]-trace_aperture["hcut1"])
     print("In all, %.0f trace pixels out of %.0f were masked (fraction of %.2f) and %.0f frames will be skipped." % (totalmasked, total, totalmasked/total, len(frames_to_reject)))
-    
-    print("Stage 3 calibrations completed in %.3f minutes." % ((time.time()-t0)/60))
     
     print("Writing calibrated fits file as several .fits files...")
     for i, file in enumerate(files):
@@ -250,9 +248,13 @@ def mask_flagged(segments, dqflags, trace_aperture):
     # Get borders to evaluate.
     hcut1, hcut2, vcut1, vcut2 = trace_aperture["hcut1"], trace_aperture["hcut2"], trace_aperture["vcut1"], trace_aperture["vcut2"]
     
-    # Turn dqflags into mask arrays.
+    # Turn dqflags into mask arrays, and add nan mask.
     dq_mask = np.empty_like(dqflags)
     dq_mask[:, :, :] = np.where(dqflags[:, :, :] > 0, 1, 0)
+    dq_mask[np.isnan(segments)] = 1
+
+    # Mask array.
+    masked_segments = np.ma.masked_array(segments,dq_mask)
     
     print("Masking flagged pixels pixels inside and outside of the trace...")
     t0 = time.time()
@@ -261,9 +263,10 @@ def mask_flagged(segments, dqflags, trace_aperture):
     for i in range(np.shape(segments)[1]):
         for j in range(np.shape(segments)[2]):
             # Track temporal variations and replace any flagged pixels with the temporal median
-            # that was calculated out of only unmasked values.
-            pmed = np.ma.median(np.ma.masked_array(segments[:, i, j], dq_mask[:, i, j]))
-            psigma = np.std(np.ma.masked_array(segments[:, i, j], dq_mask[:, i, j]))
+            # that was calculated out of only unmasked values.            
+            #pmed = np.ma.median(np.ma.masked_array(segments[:, i, j], dq_mask[:, i, j]))
+            # NEW: trying to replace it with median of neighbors instead.
+            pmed = np.ma.median(masked_segments[:,i-1:i+2,j-1:j+2])
             if (i in range(hcut1, hcut2) and j in range(vcut1, vcut2)):
                 masked_flagged += np.count_nonzero(dqflags[:, i, j])
             segments[:, i, j] = np.where(dq_mask[:, i, j] == 1, pmed, segments[:, i, j])

@@ -25,7 +25,8 @@ def doStage4(filesdir, outdir,
                                    "max_wav":None,
                                    "wavbins":np.linspace(0.6,5.3,70),
                                    "ext_type":"box",
-                                   "badcol_threshold":1.5},
+                                   "badcol_threshold":1.5,
+                                   "omit_columns":[]},
              median_normalize_curves={"skip":False,
                                       "event_type":"transit"},
              sigma_clip_curves={"skip":False,
@@ -93,7 +94,8 @@ def doStage4(filesdir, outdir,
                                                                              wavelength_range=(extract_light_curves["min_wav"],extract_light_curves["max_wav"]),
                                                                              wavbins=extract_light_curves["wavbins"],
                                                                              ext_type=extract_light_curves["ext_type"],
-                                                                             badcol_threshold=extract_light_curves["badcol_threshold"])
+                                                                             badcol_threshold=extract_light_curves["badcol_threshold"],
+                                                                             omit_columns = extract_light_curves["omit_columns"])
 
     if not median_normalize_curves["skip"]:
         wlc = median_normalize(wlc,
@@ -147,7 +149,7 @@ def doStage4(filesdir, outdir,
         print("Files written.")
     print("Stage 4 calibrations completed in %.3f minutes." % ((time.time() - t0)/60))
 
-def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject, binmode, columns, wavelength_range, wavbins, ext_type, badcol_threshold):    
+def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject, binmode, columns, wavelength_range, wavbins, ext_type, badcol_threshold, omit_columns):    
     '''
     Extract a white light curve and spectroscopic light curves from the trace.
     
@@ -164,11 +166,18 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
     :param wavbins: list of floats. The edges defining each spectroscopic light curve. The ith bin will count pixels that have wavelength solution wavbins[i] <= wav < wavbins[i+1].
     :param ext_type: str. Choices are "box" or "polycol". The first is a standard extraction, while all the others define types of optimal extraction apertures.
     :param badcol_threshold: float. Threshold at which to toss a column for being too unstable.
+    :param omit_columns: lst of lst of int. If not empty, bounds of columns you want to omit manually.
     :return: corrected timestamps, median-normalized white light curve, and median-normalized spectroscopic light curve.
     '''
     # Update aperture so that for every frame in it, where wavelength is nan becomes masked (1).
+    print("Masking NaN wavelengths...")
     for i in range(aperture.shape[0]):
         aperture[i,:,:][np.isnan(wavelengths[0])] = 1
+    # Omit columns.
+    if omit_columns:
+        print("Masking columns you identified as bad...")
+        for bounds in omit_columns:
+            aperture[:,:,bounds[0]:bounds[1]] = 1
     # Get just the trace that you want to sum over.
     trace = np.ma.masked_array(segments, aperture)
 
@@ -188,24 +197,33 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
     plt.close()
     satisfied = False
     while not satisfied:
-        plt.plot(test_diff)
-        plt.axhline(threshold, ls='--', color='red')
-        plt.title("Where standard deviation is unexpectedly high")
-        plt.xlabel("column #")
-        plt.ylabel("abs(median filtered - true std dev)")
-        plt.ylim(0,0.2)
-        plt.show()
-        plt.close()
-        change = int(input("Change threshold? Yes (1) or no (0): "))
-        if change == 0:
-            satisfied = True
-        elif change == 1:
-            threshold = float(input("New threshold: "))
+        try:
+            plt.plot(test_diff)
+            plt.axhline(threshold, ls='--', color='red')
+            plt.title("Where standard deviation is unexpectedly high")
+            plt.xlabel("column #")
+            plt.ylabel("abs(median filtered - true std dev)")
+            plt.ylim(0,0.2)
+            plt.show()
+            plt.close()
+            change = int(input("Change threshold? Yes (1) or no (0): "))
+            if change == 0:
+                satisfied = True
+            elif change == 1:
+                threshold = float(input("New threshold: "))
+            else:
+                print("Input not recognized, restarting...")
+        except ValueError:
+            print("Input not recognized, restarting...")
     bad_columns = np.argwhere(test_diff>threshold)
     print("Identified and masked {} bad columns out of {} (fraction of {:.4f}).".format(len(bad_columns),len(test_oneDspec),len(bad_columns)/len(test_oneDspec)))
     for i in range(aperture.shape[0]):
         for col in bad_columns:
             aperture[i,:,col] = 1
+    plt.imshow(aperture[0,:,:], aspect=5)
+    plt.title("Aperture for extraction")
+    plt.show()
+    plt.close()
     trace = np.ma.masked_array(segments, aperture)
     
     # Initialize 1Dspec objects.
@@ -218,6 +236,10 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
         print("Building spatial profile for optimal extraction...")
         spatial_profile = get_spatial_profile(trace, ext_type=ext_type)
         print("Built.")
+        plt.imshow(spatial_profile[0,:,:])
+        plt.title("Aperture used for extraction")
+        plt.show()
+        plt.close()
     for k in range(np.shape(segments)[0]):
         if k in frames_to_reject:
             print("Integration %.0f will be skipped." % k)
@@ -306,6 +328,12 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                         masks.append([mask])
                 masks_built_yet = 1
                 print("Masks built.")
+                for mask, central_lam in zip(masks, central_lams):
+                    plt.imshow(mask[0])
+                    plt.title(str(central_lam) + " um")
+                    plt.show()
+                    plt.close()
+                print(central_lams, len(central_lams), len(masks))
             
             if ext_type != "box":
                 # Have to perform optimal extraction.
@@ -649,9 +677,13 @@ def fix_mirror_tilt(lc, where):
     n = lc.shape[0]
     pre_med = np.nanmedian(lc[0:int(n*0.20)])
     post_med = np.nanmedian(lc[int(n*0.80):n])
-    Delta_tilt = pre_med - post_med
+    print(pre_med, post_med)
+    #Delta_tilt = pre_med - post_med
+    for i in range(0, where):
+        lc[i] = lc[i]/pre_med
     for i in range(where, n):
-        lc[i] += Delta_tilt
+        lc[i] = lc[i]/post_med
+        #lc[i] += Delta_tilt
     return lc
     
 

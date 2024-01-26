@@ -894,7 +894,7 @@ def log_prior(theta, modified_keys, params, priors_dict, priors_type, using_kipp
         if not 0.001 < theta_dict["rp"] < 100:
             checks_on_posteriors.append("F")
     if "fp" in theta_dict.keys():
-        if not 0 < theta_dict["fp"] < 100:
+        if not 0 <= theta_dict["fp"] < 100:
             checks_on_posteriors.append("F")
     
     if using_kipping:
