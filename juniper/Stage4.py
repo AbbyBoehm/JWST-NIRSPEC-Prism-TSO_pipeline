@@ -144,8 +144,11 @@ def doStage4(filesdir, outdir,
         write_light_curve(times, wlc, "wlc", txts_outdir)
         write_wvs_file(wavelength_bin_edges[0][0], wavelength_bin_edges[-1][1],-99,"wlc_wvs", txts_outdir)
         for i, lc in enumerate(slc):
-            write_light_curve(times, lc, "slc_%.3fmu_%.3fmu" % (wavelength_bin_edges[i][0],wavelength_bin_edges[i][1]), txts_outdir)
-            write_wvs_file(wavelength_bin_edges[i][0],wavelength_bin_edges[i][1],central_lams[i],"slc_%.3fmu_%.3fmu_wvs" % (wavelength_bin_edges[i][0],wavelength_bin_edges[i][1]), txts_outdir)
+            if np.isnan(central_lams[i]):
+                print("Wavelength {} was recorded as nan, passing...".format(i))
+            else:
+                write_light_curve(times, lc, "slc_%.3fmu_%.3fmu" % (wavelength_bin_edges[i][0],wavelength_bin_edges[i][1]), txts_outdir)
+                write_wvs_file(wavelength_bin_edges[i][0],wavelength_bin_edges[i][1],central_lams[i],"slc_%.3fmu_%.3fmu_wvs" % (wavelength_bin_edges[i][0],wavelength_bin_edges[i][1]), txts_outdir)
         print("Files written.")
     print("Stage 4 calibrations completed in %.3f minutes." % ((time.time() - t0)/60))
 

@@ -427,6 +427,7 @@ def plot_transit_spectrum(wavelengths, depths, depth_errs, reference_wavelengths
 
     ax.set_xlabel("wavelength [mu]", fontsize=14)
     ax.set_ylabel("transit depth [%]", fontsize=14)
+    ax.set_xlim(np.min(wavelengths)-0.05,np.max(wavelengths)+0.05) # set it so that the new spectrum dominates the FOV
     try:
         ax.set_ylim(100*ylim[0], 100*ylim[1])
     except ValueError:
@@ -611,24 +612,40 @@ def compute_depth_rprs2(theta, theta_err):
 def compute_depth_aoverlap(theta, theta_err, exoplanet_params):
     if "inc" in theta.keys():
         inc = theta["inc"]
+        inc_err = theta_err["inc"]*np.pi/180
     else:
         inc = exoplanet_params["inc"]
+        inc_err = 0
     if "aoR" in theta.keys():
         aoR = theta["aoR"]
+        aoR_err = theta_err["aoR"]
     else:
         aoR = exoplanet_params["aoR"]
+        aoR_err = 0
     bo = aoR*np.cos(inc*np.pi/180)
     bo_sq = bo**2
+    bo_err = np.sqrt((np.cos(inc*np.pi/180)*aoR_err)**2 + (aoR*np.sin(inc*np.pi/180)*inc_err)**2)
+    
     rs = 1
     rs_sq = rs**2
+
     rp = theta["rp"]
     rp_sq = rp**2
+    rp_err = theta_err["rp"]
 
     arg_phi_1 = ((bo_sq * rs_sq) + rp_sq - rs_sq)/(2 * (bo * rs) * rp)
+    arg_phi_1_err = np.sqrt((bo_err * (bo_sq * rs_sq - rp_sq + rs_sq) / (2 * bo_sq * rp * rs))**2 + 
+                            (rp_err * (-bo_sq * rs_sq + rp_sq + rs_sq) / (2 * bo * rp_sq * rs))**2)
+
     arg_phi_2 = ((bo_sq * rs_sq) + rs_sq - rp_sq)/(2 * (bo * rs) * rs)
+    arg_phi_2_err = np.sqrt((bo_err * (bo_sq * rs_sq + rp_sq - rs_sq) / (2 * bo_sq * rs_sq))**2 + 
+                            (rp_err * rp / (bo * rs_sq))**2)
 
     phi_1 = np.arccos(arg_phi_1)  # Angle at planet centre
+    phi_1_err = np.sqrt(arg_phi_1_err**2 / (1 - arg_phi_1))
+
     phi_2 = np.arccos(arg_phi_2)  # Angle at star centre
+    phi_2_err = np.sqrt(arg_phi_2_err**2 / (1 - arg_phi_2))
 
     # Evaluate the overlapping area analytically
     A_overlap = (rp_sq * (phi_1 - 0.5 * np.sin(2.0 * phi_1)) +
@@ -637,11 +654,18 @@ def compute_depth_aoverlap(theta, theta_err, exoplanet_params):
     depth = A_overlap/A_s
 
     # The tedious process of computing the depth error
+    '''
     dphi_1 = (rs_sq*(bo_sq-1)-rp_sq)/(rp*np.sqrt(rs_sq*rs_sq*(-(bo_sq-1)**2)+2*rs_sq*(bo_sq+1)*rp_sq-rp_sq*rp_sq))
     dphi_2 = 2*rp/(np.sqrt(rs_sq*rs_sq*(-(bo_sq-1)**2)+2*rs_sq*(bo_sq+1)*rp_sq-rp_sq*rp_sq))
     err = (2*rp*(phi_1-0.5*np.sin(2 * phi_1))
            + rp_sq*dphi_1*(1-np.cos(2 * phi_1))
            + rs_sq*dphi_2*(1-np.cos(2 * phi_2)))*theta_err["rp"]
+    '''
+    dAdrp = 2*rp*(phi_1 - 0.5 * np.sin(2.0 * phi_1))/A_s
+    dAdphi_1 = rp_sq*(1 - np.cos(2.0 * phi_1))/A_s
+    dAdphi_2 = rs_sq*(1 - np.cos(2.0 * phi_2))/A_s
+
+    err = np.sqrt((dAdrp*rp_err)**2 + (dAdphi_1*phi_1_err)**2+(dAdphi_2*phi_2_err)**2)
     return depth, err
 
 def compute_depth_fpfs(theta, theta_err):
