@@ -132,6 +132,7 @@ def build_theta_dict(a1, a2, exoplanet_params, fixed_param):
     
     theta_guess["a1"] = a1
     theta_guess["a2"] = a2
+    
     #if "rp" in list(exoplanet_params.keys()):
     #    theta_guess["rp"] = exoplanet_params["rp"]
     #if "fp" in list(exoplanet_params.keys()):
@@ -253,8 +254,8 @@ if exotic_ld_available:
             M_H, Teff, logg = stellar_params
         # And wavelengths for fitting coefficients
         spectral_range = exoticLD["spectral_range"]
-        # And set mode to PRISM
-        mode = "JWST_NIRSpec_Prism"
+        # And read mode from exoticLD
+        mode = exoticLD["instrument_mode"]
         # Check for custom model.
         if exoticLD["ld_grid"] == "custom":
             file_path = exoticLD["custom_model_path"]
@@ -293,19 +294,28 @@ def plot_fit_and_res(t, lc, err, model, interp_t, residuals):
 def plot_chains(ndim, samples, labels):
     fig, axes = plt.subplots(ndim, figsize=(10, 7), sharex=True)
     for i in range(ndim):
-        ax = axes[i]
+        try:
+            ax = axes[i]
+        except TypeError:
+            # There is only one axis because there was only one sample.
+            ax = axes
         ax.plot(samples[:, :, i], "k", alpha=0.3)
         ax.set_xlim(0, len(samples))
         ax.set_ylabel(labels[i])
         ax.yaxis.set_label_coords(-0.1, 0.5)
-
-    axes[-1].set_xlabel("step number")
+        
+    #axes[-1].set_xlabel("step number")
+    ax.set_xlabel("step number") # will automatically grab last used axis
     return fig, axes
 
 def plot_post(ndim, samples, labels, n):
     fig, axes = plt.subplots(ndim, figsize=(10, 7), sharex=False)
     for i in range(ndim):
-        ax = axes[i]
+        try:
+            ax = axes[i]
+        except TypeError:
+            # There is only one axis because there was only one sample.
+            ax = axes
         post = np.reshape(samples[:, :, i], (n))
         ax.hist(post, 100, alpha=0.3)
         ax.set_xlim(min(post), max(post))

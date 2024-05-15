@@ -8,6 +8,7 @@ import time
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
 from scipy import signal
+from scipy.optimize import least_squares
 
 from .utils import stitch_files
 
@@ -24,8 +25,10 @@ def doStage4(filesdir, outdir,
                                    "min_wav":None,
                                    "max_wav":None,
                                    "wavbins":np.linspace(0.6,5.3,70),
+                                   "timebins":None,
                                    "ext_type":"box",
                                    "badcol_threshold":1.5,
+                                   "ask_adjust":True,
                                    "omit_columns":[]},
              median_normalize_curves={"skip":False,
                                       "event_type":"transit"},
@@ -37,8 +40,14 @@ def doStage4(filesdir, outdir,
                                "known_index":None},
              fix_transit_times={"skip":False,
                                 "epoch":None},
+             detrend={"skip":False,
+                      "linear":True,
+                      "exp-ramp":True,
+                      "quadratic":False},
              plot_light_curves={"skip":False,
-                                "event_type":"transit"},
+                                "event_type":"transit",
+                                "oot":[0,500],
+                                "expected_depth":None},
              save_light_curves={"skip":False}
             ):
     '''
@@ -48,12 +57,13 @@ def doStage4(filesdir, outdir,
     :param outdir: str. Location where you want output images and text files to be saved to.
     :param trace_aperture: dict. Keywords are "hcut1", "hcut2", "vcut1", "vcut2", all integers denoting the rows and columns respectively that define the edges of the aperture bounding the trace.
     :param mask_unstable_pixels: dict. Keywords are "skip", "threshold". Whether to mask pixels whose normalized standard deviations are higher than the threshold value.
-    :param extract_light_curves: dict. Keywords are "skip", "binmode", "columns", "min_wav", "max_wav", "wavbins", "ext_type", "badcol_threshold". Whether to extract light curves using the given wavelength bin edges or column number with wavelength limits, the specified extraction type (options are "box", "polycol", "polyrow", "smooth", "medframe"), and a threshold for cutting out bad columns.
+    :param extract_light_curves: dict. Keywords are "skip", "binmode", "columns", "min_wav", "max_wav", "wavbins", "timebins", "ext_type", "badcol_threshold","ask_adjust". Whether to extract light curves using the given wavelength bin edges or column number with wavelength limits, the given time bins (may be None for no binning in time), the specified extraction type (options are "box", "polycol", "polyrow", "smooth", "medframe"), and a threshold for cutting out bad columns (and whether to ask if you want to adjust that threshold).
     :param median_normalize_curves. dict. Keywords are "skip", "event_type". Whether to normalize curves by their median value. "event_type" specifies "transit" or "eclipse".
     :param sigma_clip_curves: dict. Keywords are "skip", "b", "clip_at". Whether to sigma-clip the light curves every b points, rejecting outliers at clip_at sigma.
     :param fix_mirror_tilts: dict. Keywords are "skip", "threshold". Whether to look for and fix mirror tilt events.
     :param fix_transit_times: dict. Keywords are "skip", "epoch". Whether to fix the transit times so that epoch becomes the 0-point.
-    :param plot_light_curves: dict. Keyword is "skip". Whether to save plots of the light curves.
+    :param detrend: dict. Keywords are "skip", "linear", "exp-ramp", "quadratic". Whether to detrend the extracted light curves and which detrending models to use.
+    :param plot_light_curves: dict. Keywords are "skip", "event_type", "oot". Whether to save plots of the light curves. If so, specify event type (transit or eclipse) and the indices encasing the pre- OR post-transit/eclipse flux.
     :param save_light_curves: dict. Keyword is "skip". Whether to save .txt files of the light curves.
     :return: .txt files of curves extracted from the postprocessed_*.fits files and images related to extraction.
     '''
@@ -93,8 +103,10 @@ def doStage4(filesdir, outdir,
                                                                              columns=extract_light_curves["columns"],
                                                                              wavelength_range=(extract_light_curves["min_wav"],extract_light_curves["max_wav"]),
                                                                              wavbins=extract_light_curves["wavbins"],
+                                                                             timebins=extract_light_curves["timebins"],
                                                                              ext_type=extract_light_curves["ext_type"],
                                                                              badcol_threshold=extract_light_curves["badcol_threshold"],
+                                                                             ask_adjust=extract_light_curves["ask_adjust"],
                                                                              omit_columns = extract_light_curves["omit_columns"])
 
     if not median_normalize_curves["skip"]:
@@ -125,15 +137,29 @@ def doStage4(filesdir, outdir,
         times=fix_times(times, wlc=wlc,
                         epoch=fix_transit_times["epoch"])
         print("Fixed.")
-        
+
+    if not detrend["skip"]:
+        print("Removing specified systematic trends from light curve...")
+        wlc = correct_trends(times, wlc,
+                             fit_linear = detrend["linear"],
+                             fit_expramp = detrend["exp-ramp"],
+                             fit_quadratic = detrend["quadratic"],
+                             plot=True)
+        for i, lc in enumerate(slc):
+            slc[i] = correct_trends(times, lc,
+                                    fit_linear = detrend["linear"],
+                                    fit_expramp = detrend["exp-ramp"],
+                                    fit_quadratic = detrend["quadratic"])
     if not plot_light_curves["skip"]:
         print("Generating output plots of extracted light curves...")
         imgs_outdir = os.path.join(outdir, "output_imgs_extraction")
         if not os.path.exists(imgs_outdir):
             os.makedirs(imgs_outdir)
-        plot_curve(times, wlc, plot_light_curves["event_type"], "White light curve", "wlc", imgs_outdir)
+        plot_curve(times, wlc, plot_light_curves["event_type"], "White light curve", "wlc", imgs_outdir, expected_depth=plot_light_curves["expected_depth"])
         for lc, central_lam in zip(slc, central_lams):
             plot_curve(times, lc, plot_light_curves["event_type"], "Spectroscopic light curve at %.3f micron" % central_lam, "slc_%.3fmu" % central_lam, imgs_outdir)
+            plot_Allan(times, lc, plot_light_curves["oot"], "slc%.3fmu_AllanVariance" % central_lam, imgs_outdir)
+        plot_Allan(times, wlc, plot_light_curves["oot"], "wlc_AllanVariance", imgs_outdir)
         print("Plots generated.")
     
     if not save_light_curves["skip"]:
@@ -152,7 +178,7 @@ def doStage4(filesdir, outdir,
         print("Files written.")
     print("Stage 4 calibrations completed in %.3f minutes." % ((time.time() - t0)/60))
 
-def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject, binmode, columns, wavelength_range, wavbins, ext_type, badcol_threshold, omit_columns):    
+def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, frames_to_reject, binmode, columns, wavelength_range, wavbins, timebins, ext_type, badcol_threshold, ask_adjust, omit_columns):    
     '''
     Extract a white light curve and spectroscopic light curves from the trace.
     
@@ -167,8 +193,10 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
     :param columns: int. If binmode is "columns", bin every N columns.
     :param wavelength_range: tup of floats. If binmode is "columns", the min and max wavelength that will be included.
     :param wavbins: list of floats. The edges defining each spectroscopic light curve. The ith bin will count pixels that have wavelength solution wavbins[i] <= wav < wavbins[i+1].
+    :param timebins: None or int. How many frames to bin in, if you want to downsample the time resolution in favor of superior SNR. Enter None to keep native time resolution.
     :param ext_type: str. Choices are "box" or "polycol". The first is a standard extraction, while all the others define types of optimal extraction apertures.
     :param badcol_threshold: float. Threshold at which to toss a column for being too unstable.
+    :param ask_adjust: bool. Whether you want to revisee the threshold.
     :param omit_columns: lst of lst of int. If not empty, bounds of columns you want to omit manually.
     :return: corrected timestamps, median-normalized white light curve, and median-normalized spectroscopic light curve.
     '''
@@ -209,7 +237,10 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
             plt.ylim(0,0.2)
             plt.show()
             plt.close()
-            change = int(input("Change threshold? Yes (1) or no (0): "))
+            if ask_adjust:
+                change = int(input("Change threshold? Yes (1) or no (0): "))
+            else:
+                change = 0
             if change == 0:
                 satisfied = True
             elif change == 1:
@@ -377,9 +408,53 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
             lc.append(oneDspec[j][i])
         slc.append(np.array(lc))
     # Now each object in slc is a full time series corresponding to just one wavelength bin.
-    print("Reshaped. Returning wlc and slc...")
-    
+    print("Reshaped.")
+
+    if timebins != None:
+        # Downsample the curves in time.
+        print("Binning the light curves in time, with {} frames per downsampled timestamp...".format(timebins))
+        ds_wlc, ds_times = time_bin(wlc, times_with_skips, timebins)
+
+        ds_slc = []
+        for lc in slc:
+            ds_lc, ds_times = time_bin(lc, times_with_skips, timebins)
+            ds_slc.append(np.array(ds_lc))
+
+        wlc = ds_wlc
+        slc = ds_slc
+        times_with_skips = ds_times
+
+    print("Returning wlc and slc...")
     return wlc, slc, times_with_skips, np.round(central_lams, 3), wavelength_bin_edges
+
+def time_bin(lc, t, N):
+    N_odd_bin = len(lc)%N # the one bin that's too small to fit the whole timestamp
+    N_bins = int((len(lc)-N_odd_bin)/N) # total number of whole bins of size timebins we can take
+
+    ds_lc = []
+    ds_t = []
+    retain_i = 0
+    for i in range(1, N_bins-1):
+        #print("Binning indices {} to {}...".format((i-1)*N,i*N))
+        ds_lc.append(np.mean(lc[(i-1)*N:i*N]))
+        ds_t.append(np.mean(t[(i-1)*N:i*N]))
+        retain_i = i*N
+    # How to handle the last bin? If N_odd_bin > timebins/2, we should let it be its own bin. If not, we should make the last bin slightly too long.
+    if N_odd_bin < (N/2):
+        # Jump ahead to the end of the curve.
+        #print("Binning indices {} to last...".format(retain_i))
+        ds_lc.append(np.mean(lc[retain_i:-1]))
+        ds_t.append(np.mean(t[retain_i:-1]))
+    else:
+        # Break it into two bins.
+        #print("Binning indices {} to {}...".format(retain_i,retain_i+N))
+        ds_lc.append(np.mean(lc[retain_i:retain_i+N]))
+        ds_t.append(np.mean(t[retain_i:retain_i+N]))
+        #print("Binning indices {} to last...".format(retain_i+N))
+        ds_lc.append(np.mean(lc[retain_i+N:-1]))
+        ds_t.append(np.mean(t[retain_i+N:-1]))
+
+    return ds_lc, ds_t
 
 def get_spatial_profile(segments, ext_type="polycol"):
     '''
@@ -688,9 +763,142 @@ def fix_mirror_tilt(lc, where):
         lc[i] = lc[i]/post_med
         #lc[i] += Delta_tilt
     return lc
-    
 
-def plot_curve(t, lc, event_type, title, outfile, outdir):
+def correct_trends(t, lc, fit_linear=True, fit_expramp=True, fit_quadratic=True, plot=False):
+    '''
+    Corrects for common systematic trends.
+
+    :param t: 1D array. The timestamps of each flux point.
+    :param lc: 1D array. The light curve that you want to remove systematics from.
+    :param fit_linear: bool. Whether to fit a visit-long slope to the observations.
+    :param fit_expramp: bool. Whether to fit an exponential ramp to the observations.
+    :param fit_quadratc: bool. Whether to fit a quadratic trend to the observations.
+    :param plot: bool. Whether to plot the fitted trend.
+    '''
+    # Set everything to numpy just in case.
+    t = np.array(t)
+    lc = np.array(lc)
+    if plot:
+        fig, axs = plt.subplots(2,1)
+        axs[0].scatter(t,lc,color='k')
+        axs[1].scatter(t,lc,color='k',alpha=0.25,label="input")
+    if fit_quadratic:
+        result = least_squares(quadratic_residuals_,
+                               np.array([0,0,1]),
+                               args=(t,lc))
+        trend = result.x[0]*(t**2) + result.x[1]*t + result.x[2]
+        if plot:
+            axs[0].plot(t,trend,color='green',label='quadratic')
+        lc /= trend
+    if fit_linear:
+        result = least_squares(linear_residuals_,
+                               np.array([0,1]),
+                               args=(t,lc))
+        trend = result.x[0]*t + result.x[1]
+        if plot:
+            axs[0].plot(t,trend,color='red',label='linear')
+        lc /= trend
+    if fit_expramp:
+        result = least_squares(expramp_residuals_,
+                               np.array([1,0]),
+                               args=(t,lc))
+        trend = result.x[0]*np.exp(result.x[1]*t)
+        if plot:
+            axs[0].plot(t,trend,color='blue',label='exp-ramp')
+        lc /= trend
+    if plot:
+        axs[1].scatter(t,lc,color='k',label='processed')
+        axs[0].legend(loc='upper right')
+        axs[1].legend(loc='upper right')
+        plt.show()
+        plt.close()
+    return lc
+
+def linear_residuals_(fit,x,flx):
+    model = fit[0]*x + fit[1]
+    residuals = [(i/j) - 1 for i, j in zip(flx,model)]
+    return residuals
+
+def expramp_residuals_(fit,x,flx):
+    model = fit[0]*np.exp(fit[1]*x)
+    residuals = [(i/j) - 1 for i, j in zip(flx,model)]
+    return residuals
+
+def quadratic_residuals_(fit,x,flx):
+    model = fit[0]*(x**2) + fit[1]*x + fit[2]
+    residuals = [(i/j) - 1 for i, j in zip(flx,model)]
+    return residuals
+    
+def plot_Allan(t, lc, indices_of_oot, outfile, outdir):
+    '''
+    Creates and saves an Allan Variance plot using the oot residuals.
+
+    :param t: 1D array. Timestamps of each exposure in the light curve.
+    :param lc: 1D array. Flux values in the light curve.
+    :param indices_of_oot: lst of float. Indices marking the beginning and ending of the oot.
+    :param outfile: str. Name of the file you want to save, sans the ".pdf" extension.
+    :param outdir: str. Directory where the plot will be saved to.
+    :return: Allan Variance plot .pdf saved to outdir/outfile.
+    '''
+    # First, get the oot residuals and std dev.
+    t = np.array(t[indices_of_oot[0]:indices_of_oot[1]])
+    res = np.array(est_err(t,lc[indices_of_oot[0]:indices_of_oot[1]]))
+    res_std = np.std(res)
+                  
+    # Now repeatedly bin the residuals down and see how they evolve.
+    bins = [i for i in range(2,len(res)//10)] # size of the bins
+    rms = []
+    stderr = []
+    for N in bins:        
+        b_res, b_t = time_bin(res, t, N)
+        b_rms = get_rms(b_res)
+        b_std = get_GST(b_res, res_std, N)
+        
+        rms.append(b_rms)
+        stderr.append(b_std)
+    f = 1e-6 # normalization factor
+
+    # And plot everything.
+    fig, ax = plt.subplots(figsize=(5, 5))
+    ax.plot(bins, [i/f for i in stderr], c='red', lw=2.0, label="Gaussian Std Err")
+    ax.plot(bins, [i/f for i in rms], c='k',label='rms',lw=1.5)
+    # Set up plot parmeters nicely and then save.
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlabel("bin size [# frames]")
+    ax.set_ylabel("rms [ppm]")
+    plt.savefig(os.path.join(outdir, outfile + ".pdf"), dpi=300, bbox_inches='tight')
+    plt.close()
+
+def get_rms(r):
+    return (np.sum([i**2 for i in r])/len(r))**0.5
+
+def get_GST(r, res_std, N):
+    return res_std * ((len(r)/(N*(len(r)-1)))**0.5)
+
+def est_err(x,flx):
+    result = least_squares(residuals_,
+                           np.array([1,1,0,1]),
+                           args=(x,flx,False))
+    
+    res = residuals_(result.x,x,flx,True)
+    return res
+
+def residuals_(fit,x,flx,snip):
+    rs = rampslope(x,fit[0],fit[1],fit[2],fit[3])
+    residuals = flx-rs
+    # Remove outlier points.
+    if snip:
+        res_mean = np.mean(residuals)
+        res_sig = np.std(residuals)
+        outliers = np.where(np.abs(residuals-res_mean) > 3*res_sig)[0]
+        residuals = np.delete(residuals, outliers)
+    return residuals
+
+def rampslope(x,a,b,c,d):
+    return a*np.exp(b*x) + c*x + d
+
+def plot_curve(t, lc, event_type, title, outfile, outdir, expected_depth=None):
     '''
     Creates and saves a plot of the given light curve to the outdir.
 
@@ -702,12 +910,17 @@ def plot_curve(t, lc, event_type, title, outfile, outdir):
     :param outdir: str. Directory where the light curve plot will be saved to.
     :return: light curve plot .pdf saved to outdir/outfile.
     '''
-    fig, ax = plt.subplots(figsize=(20, 5))
+    fig, ax = plt.subplots(figsize=(7, 3))
     ax.scatter(t, lc, s=3)
+    if expected_depth is not None:
+        x = [np.min(t), np.max(t)]
+        ax.axhline(y=1-(expected_depth[0]/1e6),color='red',ls='--')
+        ax.fill_between(x, y1=1-(expected_depth[0]/1e6)-(expected_depth[1]/1e6),y2=1-(expected_depth[0]/1e6)+(expected_depth[1]/1e6),alpha=0.25,color='red')
+        ax.fill_between(x, y1=1-(expected_depth[0]/1e6)-(2*expected_depth[1]/1e6),y2=1-(expected_depth[0]/1e6)+(2*expected_depth[1]/1e6),alpha=0.25,color='red')
     ax.set_xlabel("time since mid-{} [days]".format(event_type))
     ax.set_ylabel("relative flux [no units]")
     ax.set_title(title)
-    plt.savefig(os.path.join(outdir, outfile + ".pdf"), dpi=300)
+    plt.savefig(os.path.join(outdir, outfile + ".pdf"), dpi=300, bbox_inches='tight')
     plt.close()
 
 def write_light_curve(t, lc, outfile, outdir):

@@ -136,9 +136,21 @@ def one_over_f_subtraction(data, bckg_rows, bckg_kernel, bckg_sigma, show):
         print("Built background model. Resuming background subtraction...")
 
     for i in range(np.shape(data)[0]): # for each integration
+        final_group = clean(np.copy(data[i,-1,:,:]),3,(5,1)) # select the very last group, which should have the brightest, strongest trace signal for masking. Remove outliers from it.
+        mu = np.median(final_group[final_group<10000])
+        sig = np.std(final_group[final_group<10000])
+        masked_fg = np.ma.masked_where(np.abs(final_group - mu) > sig, final_group)
+        trace_mask = np.ma.getmask(masked_fg) # and obtain the mask that hides the trace.
+        if (i == 0 and show):
+            plt.imshow(trace_mask)
+            plt.title('1/f trace mask')
+            plt.show()
+            plt.close()
         for g in range(np.shape(data)[1]): # for each group
             # Define the background region.    
-            background_region = np.copy(data[i, g, bckg_rows, :])
+            background_region = np.ma.masked_array(data=np.copy(data[i, g, :, :]),
+                                                   mask=trace_mask)#np.copy(data[i, g, bckg_rows, :])
+
             
             if (i == 0 and g == 0 and show):
                 fig, ax, im = img(np.log10(np.abs(background_region)), aspect=5, vmin=None, vmax=None, norm=None)
@@ -147,16 +159,16 @@ def one_over_f_subtraction(data, bckg_rows, bckg_kernel, bckg_sigma, show):
                 plt.close()
             
             # Clean the background region of outliers, so that CRs aren't propagated through the array.
-            background_region = clean(background_region, bckg_sigma, bckg_kernel)
-            if (i == 0 and g == 0 and show):
-                fig, ax, im = img(np.log10(np.abs(background_region)), aspect=5, vmin=None, vmax=None, norm=None)
-                plt.colorbar(im)
-                plt.show()
-                plt.close()
-            
+            #background_region = clean(background_region, bckg_sigma, bckg_kernel)
+            #if (i == 0 and g == 0 and show):
+            #    fig, ax, im = img(np.log10(np.abs(background_region)), aspect=5, vmin=None, vmax=None, norm=None)
+            #    plt.colorbar(im)
+            #    plt.show()
+            #    plt.close()
+
             # Define the mean background in each column and extend to a full-size array.
             #background = background_region.mean(axis=0)
-            background = np.median(background_region,axis=0)
+            background = np.ma.median(background_region,axis=0)
             background = np.array([background,]*np.shape(data)[2])
             if (i == 0 and g == 0 and show):
                 fig, ax, im = img(np.log10(np.abs(background)), aspect=5, vmin=None, vmax=None, norm=None)
@@ -196,7 +208,6 @@ def one_over_f_subtraction(data, bckg_rows, bckg_kernel, bckg_sigma, show):
                 plt.close()
 
             del(background_region) # recover memory
-                
         if (i%1000 == 0 and i != 0):
             # Report every 1000 integrations.
             elapsed_time = time.time()-t0
