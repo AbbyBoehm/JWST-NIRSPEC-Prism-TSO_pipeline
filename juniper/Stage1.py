@@ -6,6 +6,7 @@ import time
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.optimize import least_squares
+from scipy.stats import linregress
 from astropy.stats import sigma_clip
 
 from jwst.pipeline import Detector1Pipeline
@@ -136,22 +137,54 @@ def one_over_f_subtraction(data, bckg_rows, bckg_kernel, bckg_sigma, show):
         print("Built background model. Resuming background subtraction...")
 
     for i in range(np.shape(data)[0]): # for each integration
-        final_group = clean(np.copy(data[i,-1,:,:]),3,(5,1)) # select the very last group, which should have the brightest, strongest trace signal for masking. Remove outliers from it.
-        mu = np.median(final_group[final_group<10000])
-        sig = np.std(final_group[final_group<10000])
-        masked_fg = np.ma.masked_where(np.abs(final_group - mu) > sig, final_group)
-        trace_mask = np.ma.getmask(masked_fg) # and obtain the mask that hides the trace.
+        if bckg_rows == 'mask':
+            final_group = clean(np.copy(data[i,-1,:,:]),3,(5,1)) # select the very last group, which should have the brightest, strongest trace signal for masking. Remove outliers from it.
+            mu = np.median(final_group[final_group<10000])
+            sig = np.std(final_group[final_group<10000])
+            masked_fg = np.ma.masked_where(np.abs(final_group - mu) > sig, final_group)
+            trace_mask = np.ma.getmask(masked_fg) # and obtain the mask that hides the trace.
+        else:
+            trace_mask = np.ones_like(data[i,-1,:,:]) # copy the final group but as 1s so all is masked
+            trace_mask[bckg_rows,:] = 0 # use 0s to open the bckg rows as not masked
         if (i == 0 and show):
             plt.imshow(trace_mask)
             plt.title('1/f trace mask')
             plt.show()
             plt.close()
+        #meas = np.empty_like(data[0,:-1,:,:]) # need to make a fake int.
         for g in range(np.shape(data)[1]): # for each group
-            # Define the background region.    
-            background_region = np.ma.masked_array(data=np.copy(data[i, g, :, :]),
-                                                   mask=trace_mask)#np.copy(data[i, g, bckg_rows, :])
+            # Define the background region and clean it for outliers before masking it.
+            background_region = np.ma.masked_array(data=clean(np.copy(data[i, g, :, :]),bckg_sigma,bckg_kernel),
+                                                   mask=trace_mask)
+            '''
+            if g < (np.shape(data)[1]-1):
+                meas[g,:,:] = data[i,g,:,:]
+            else:
+                # We use the last three to project.
+                if (i == 0 and show):
+                    fig, ax, im = img(np.log10(np.abs(background_region)), aspect=5, vmin=None, vmax=None, norm=None)
+                    plt.colorbar(im)
+                    plt.show()
+                    plt.close()
+                new_group = np.empty_like(data[i,g,:,:]) # make an empty group to populate
+                for K1 in range(new_group.shape[0]):
+                    for K2 in range(new_group.shape[1]):
+                        linregress_result = linregress(x=[z for z in range(np.shape(data)[1]-1)],
+                                                       y=meas[:,K1,K2])
+                        slope, intercept = linregress_result.slope, linregress_result.intercept
+                        next_value = slope*(g+1) + intercept
+                        new_group[K1,K2] = next_value
+                background_region = np.ma.masked_array(data=clean(new_group,bckg_sigma,bckg_kernel),
+                                                       mask=trace_mask)
+                if (i == 0 and show):
+                    fig, ax, im = img(np.log10(np.abs(background_region)), aspect=5, vmin=None, vmax=None, norm=None)
+                    plt.colorbar(im)
+                    plt.show()
+                    plt.close()
+            #np.copy(data[i, g, bckg_rows, :])
+            '''
 
-            
+
             if (i == 0 and g == 0 and show):
                 fig, ax, im = img(np.log10(np.abs(background_region)), aspect=5, vmin=None, vmax=None, norm=None)
                 plt.colorbar(im)

@@ -413,9 +413,14 @@ def get_spectrum(thetas, errs, SDNRs, exoplanet_params, depth_type, ignore_high_
 def write_spectrum(outdir, outfile, wavelengths, depths, depth_errs):
     with open(os.path.join(outdir, outfile),mode="w") as f:
         f.write("#wavelength[AA]     bin[AA]     depth[na]     err[na]\n")
-        for i in range(0, len(wavelengths)-1):
+        for i in range(0, len(wavelengths)):#-1):
             l = wavelengths[i]
-            hw = (wavelengths[i+1] - wavelengths[i])
+            if i == 0:
+                hw = (wavelengths[i+1] - wavelengths[i])
+            elif i == (len(wavelengths) - 1):
+                hw = wavelengths[i]-wavelengths[i-1]
+            else:
+                hw = (wavelengths[i+1] - wavelengths[i-1])/2
             d = depths[i]
             e = depth_errs[i]
             f.write("{}     {}     {}     {}\n".format(l,hw,d,e))

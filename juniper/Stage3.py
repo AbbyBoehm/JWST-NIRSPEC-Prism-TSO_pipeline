@@ -460,6 +460,11 @@ def bckg_subtract(segments, bckg_rows, sigma):
         mmed = np.ma.median(background_region)
         background_region = background_region.filled(fill_value=mmed)
         background = background_region.mean(axis=0)
+        if i == 0:
+            plt.plot(background)
+            plt.title('Background values')
+            plt.show()
+            plt.close()
         background = np.array([background,]*np.shape(segments)[1])
         segments[i, :, :] = segments[i, :, :] - background
         if (i%1000 == 0 and i != 0):

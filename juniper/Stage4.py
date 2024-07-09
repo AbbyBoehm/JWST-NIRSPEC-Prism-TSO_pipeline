@@ -27,7 +27,7 @@ def doStage4(filesdir, outdir,
                                    "wavbins":np.linspace(0.6,5.3,70),
                                    "timebins":None,
                                    "ext_type":"box",
-                                   "badcol_threshold":1.5,
+                                   "badcol_threshold":0.1,
                                    "ask_adjust":True,
                                    "omit_columns":[]},
              median_normalize_curves={"skip":False,
@@ -218,7 +218,7 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
     test_oneDspec = np.std(test_oneDspec,axis=0)
     medfilt_test = signal.medfilt(test_oneDspec, 7)
     test_diff = np.abs(test_oneDspec - medfilt_test)
-    threshold = badcol_threshold*np.mean(test_diff)
+    threshold = badcol_threshold
     plt.plot(test_oneDspec, color='k')
     plt.plot(medfilt_test, ls='--', color='red')
     plt.title("Standard deviation by column")
@@ -293,13 +293,14 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                 if binmode == "wavelengths":
                     # Build masks that contain certain wavelength ranges.
                     print("Building wavelength masks...")
+                    masked_wavs = np.ma.masked_array(wavelength, aperture[0,:,:])
                     for j, w in enumerate(wavbins):
                         if w == wavbins[-1]:
                             # Don't build a bin at the end of the wavelength range.
                             pass
                         else:
-                            central_lams.append((wavbins[j]+wavbins[j+1])/2)
-                            wavelength_bin_edges.append((wavbins[j], wavbins[j+1]))
+                            # Test if the region is all masked or all nan.
+                            # First, produce the mask.
                             mask_step1 = np.where(wavelength <= wavbins[j+1], wavelength, 0)
                             mask_step2 = np.where(mask_step1 >= wavbins[j], mask_step1, 0)
                             mask = np.where(mask_step2 != 0, 1, 0)
@@ -307,13 +308,23 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                             mask = np.where(mask == 1, 0, 1)
                             # Finally, where the wavelength solution is nan, mask it.
                             mask[np.isnan(wavelength)] = 1
-                            '''
-                            plt.imshow(mask)
-                            plt.title("Mask for wavelength {}".format(central_lams[-1]))
-                            plt.show()
-                            plt.close()
-                            '''
-                            masks.append([mask])
+
+                            # Then get the central wavelength of this region.
+                            central_lam = np.ma.mean(np.ma.masked_array(wavelength,mask))
+                            if (np.isnan(central_lam) or np.ma.is_masked(central_lam)):
+                                # Do not collect all-nan or all-masked bins.
+                                pass
+                            else:
+                                # The central wavelength is good, so we can collect this one.
+                                central_lams.append((wavbins[j]+wavbins[j+1])/2)
+                                wavelength_bin_edges.append((wavbins[j], wavbins[j+1]))
+                                '''
+                                plt.imshow(mask)
+                                plt.title("Mask for wavelength {}".format(central_lams[-1]))
+                                plt.show()
+                                plt.close()
+                                '''
+                                masks.append([mask])
                 elif binmode == "columns":
                     # Build masks that contain a specified number of columns.
                     print("Building column masks...")
@@ -330,36 +341,46 @@ def extract_curves(segments, errors, times, aperture, segstarts, wavelengths, fr
                             pass
                         else:
                             # Get the central wavelength of this region.
-                            central_lams.append(np.ma.mean(masked_wavs[:,left_edge:right_edge]))
-                            wavelength_bin_edges.append((minimum_wavelength,
-                                                        maximum_wavelength))
-                            # Make a fully opaque mask.
-                            mask = np.ones_like(wavelength)
-                            # Open it up only in the region you want to take.
-                            mask[:,left_edge:right_edge] = 0
-                            # Remask so that nan wavelength regions are masked again.
-                            mask[np.isnan(wavelength)] = 1
-                            '''
-                            plt.imshow(mask)
-                            plt.title("Mask for wavelength {}, columns {}, {}".format(central_lams[-1], left_edge, right_edge))
-                            plt.show()
-                            plt.close()
-                            '''
-                            masks.append([mask])
+                            central_lam = np.ma.mean(masked_wavs[:,left_edge:right_edge])
+                            if (np.isnan(central_lam) or np.ma.is_masked(central_lam)):
+                                # Do not collect all-nan or all-masked bins.
+                                pass
+                            else:
+                                central_lams.append(central_lam)
+                                wavelength_bin_edges.append((minimum_wavelength,
+                                                            maximum_wavelength))
+                                # Make a fully opaque mask.
+                                mask = np.ones_like(wavelength)
+                                # Open it up only in the region you want to take.
+                                mask[:,left_edge:right_edge] = 0
+                                # Remask so that nan wavelength regions are masked again.
+                                mask[np.isnan(wavelength)] = 1
+                                '''
+                                plt.imshow(mask)
+                                plt.title("Mask for wavelength {}, columns {}, {}".format(central_lams[-1], left_edge, right_edge))
+                                plt.show()
+                                plt.close()
+                                '''
+                                masks.append([mask])
                         # Advance the column edges up.
                         left_edge += columns
                         right_edge += columns
                     if left_edge < trace.shape[2]:
                         # One last mask is needed to get the last columns.
                         # Get the central wavelength of this region.
-                        central_lams.append(np.ma.mean(masked_wavs[:,left_edge:]))
-                        # Make a fully opaque mask.
-                        mask = np.ones_like(wavelength)
-                        # Open it up only in the region you want to take.
-                        mask[:,left_edge:] = 0
-                        # Remask so that nan wavelength regions are masked again.
-                        mask[np.isnan(wavelength)] = 1
-                        masks.append([mask])
+                        central_lam = np.ma.mean(masked_wavs[:,left_edge:])
+                        if (np.isnan(central_lam) or np.ma.is_masked(central_lam)):
+                                # Do not collect all-nan or all-masked bins.
+                                pass
+                        else:
+                            central_lams.append(np.ma.mean(masked_wavs[:,left_edge:]))
+                            # Make a fully opaque mask.
+                            mask = np.ones_like(wavelength)
+                            # Open it up only in the region you want to take.
+                            mask[:,left_edge:] = 0
+                            # Remask so that nan wavelength regions are masked again.
+                            mask[np.isnan(wavelength)] = 1
+                            masks.append([mask])
                 masks_built_yet = 1
                 print("Masks built.")
                 for mask, central_lam in zip(masks, central_lams):
@@ -632,11 +653,11 @@ def median_normalize(lc, event_type):
 
 def fix_times(times, wlc=None, epoch=None):
     '''
-    Fixes times in the times array so that the mid-transit time is 0.
+    Fixes times in the times array so that the mid-transit or mid-eclipse time is 0.
     
-    :param times: 1D array. Times in MJD, not corrected for mid-transit. If both wlc and epoch are None, the mean of this object is used as the epoch.
+    :param times: 1D array. Times in MJD, not corrected for mid-transit or mid-eclipse. If both wlc and epoch are None, the mean of this object is used as the epoch.
     :param wlc: 1D array or None. If not None and epoch is None, the epoch is defined as the time when wlc hits its minimum.
-    :param epoch: float. If not None, the mid-transit time used to correct the times arrays.
+    :param epoch: float. If not None, the mid-transit or mid-eclipse time used to correct the times arrays.
     :return: corrected times array.
     '''
     if epoch is None:
