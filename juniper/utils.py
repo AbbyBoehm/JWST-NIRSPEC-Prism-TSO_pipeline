@@ -1,4 +1,6 @@
 import os
+import glob
+import shutil
 
 import numpy as np
 
@@ -322,8 +324,8 @@ def plot_post(ndim, samples, labels, n):
         ax.set_ylabel(labels[i])
     return fig, axes
 
-def plot_corner(flat_samples, labels):
-    fig = corner.corner(flat_samples, labels=labels)
+def plot_corner(nrs2_samples, labels):
+    fig = corner.corner(nrs2_samples, labels=labels)
     return fig
 
 def write_run_to_text(outdir, outfile, fit_theta, err_theta, fit_err,
@@ -687,3 +689,37 @@ def compute_depth_fpfs(theta, theta_err):
     depth = theta["fp"]
     err = theta_err["fp"]
     return depth, err
+
+def NRS_uncal_file_sorter(input_dir:str, output_dir:str):
+    """Sort exposures between NRS1 and NRS2
+
+    Parameters
+    ----------
+    input_dir       string
+                    path to parent directory with both NRS1 and NRS2 files 
+                    in directory or subdirectories
+
+    output_dir      string
+                    path to parent data directory where all uncal files 
+                    will be located
+    """
+
+    ### Ensure directories for sorted data exists
+    uncal = f"{output_dir}/uncal/"
+    nrs1 = f"{uncal}/nrs1/"
+    nrs2 = f"{uncal}/nrs2/"
+
+    if os.path.exists(uncal) != True:
+        os.makedirs(uncal)
+    if os.path.exists(nrs1) != True:
+        os.makedirs(nrs1)
+    if os.path.exists(nrs2) != True:
+        os.makedirs(nrs2)
+
+    for files in glob.glob(f"{input_dir}/**/*nrs1_uncal.fits", recursive=True):
+        fname = os.path.basename(files)
+        shutil.move(files, f"{nrs1}{fname}")
+
+    for files in glob.glob(f"{input_dir}/**/*nrs2_uncal.fits", recursive=True):
+        fname = os.path.basename(files)
+        shutil.move(files, f"{nrs2}{fname}")
