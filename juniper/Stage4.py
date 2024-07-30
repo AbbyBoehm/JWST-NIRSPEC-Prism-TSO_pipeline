@@ -41,6 +41,7 @@ def doStage4(filesdir, outdir,
              fix_transit_times={"skip":False,
                                 "epoch":None},
              detrend={"skip":False,
+                      "oots":[],
                       "linear":True,
                       "exp-ramp":True,
                       "quadratic":False},
@@ -62,7 +63,7 @@ def doStage4(filesdir, outdir,
     :param sigma_clip_curves: dict. Keywords are "skip", "b", "clip_at". Whether to sigma-clip the light curves every b points, rejecting outliers at clip_at sigma.
     :param fix_mirror_tilts: dict. Keywords are "skip", "threshold". Whether to look for and fix mirror tilt events.
     :param fix_transit_times: dict. Keywords are "skip", "epoch". Whether to fix the transit times so that epoch becomes the 0-point.
-    :param detrend: dict. Keywords are "skip", "linear", "exp-ramp", "quadratic". Whether to detrend the extracted light curves and which detrending models to use.
+    :param detrend: dict. Keywords are "skip", "oots", "linear", "exp-ramp", "quadratic". Whether to detrend the extracted light curves and which detrending models to use on the out-of-transit fluxes specified by the index pairs in oots.
     :param plot_light_curves: dict. Keywords are "skip", "event_type", "oot". Whether to save plots of the light curves. If so, specify event type (transit or eclipse) and the indices encasing the pre- OR post-transit/eclipse flux.
     :param save_light_curves: dict. Keyword is "skip". Whether to save .txt files of the light curves.
     :return: .txt files of curves extracted from the postprocessed_*.fits files and images related to extraction.
@@ -141,15 +142,18 @@ def doStage4(filesdir, outdir,
     if not detrend["skip"]:
         print("Removing specified systematic trends from light curve...")
         wlc = correct_trends(times, wlc,
+                             oots = detrend["oots"],
                              fit_linear = detrend["linear"],
                              fit_expramp = detrend["exp-ramp"],
                              fit_quadratic = detrend["quadratic"],
                              plot=True)
         for i, lc in enumerate(slc):
             slc[i] = correct_trends(times, lc,
+                                    oots = detrend["oots"],
                                     fit_linear = detrend["linear"],
                                     fit_expramp = detrend["exp-ramp"],
-                                    fit_quadratic = detrend["quadratic"])
+                                    fit_quadratic = detrend["quadratic"],
+                                    plot=True)
     if not plot_light_curves["skip"]:
         print("Generating output plots of extracted light curves...")
         imgs_outdir = os.path.join(outdir, "output_imgs_extraction")
@@ -785,19 +789,32 @@ def fix_mirror_tilt(lc, where):
         #lc[i] += Delta_tilt
     return lc
 
-def correct_trends(t, lc, fit_linear=True, fit_expramp=True, fit_quadratic=True, plot=False):
+def correct_trends(t, lc, oots, fit_linear=True, fit_expramp=True, fit_quadratic=True, plot=False):
     '''
     Corrects for common systematic trends.
 
     :param t: 1D array. The timestamps of each flux point.
     :param lc: 1D array. The light curve that you want to remove systematics from.
+    :param oots: lst of lsts. Sets of indices of out-of-transit flux. We want to remove trends, not transits.
     :param fit_linear: bool. Whether to fit a visit-long slope to the observations.
     :param fit_expramp: bool. Whether to fit an exponential ramp to the observations.
     :param fit_quadratc: bool. Whether to fit a quadratic trend to the observations.
     :param plot: bool. Whether to plot the fitted trend.
     '''
+    if not oots:
+        oots = [[0,len(t)],] # replace empty list with full array.
+    t_temp = []
+    f_temp = []
+    for oot in oots:
+        T = t[oot[0]:oot[1]]
+        F = lc[oot[0]:oot[1]]
+        for i,j in zip(T,F):
+            t_temp.append(i)
+            f_temp.append(j)
     # Set everything to numpy just in case.
-    t = np.array(t)
+    t_corr = np.array(t_temp) - np.mean(t_temp)
+    lc_corr = np.array(f_temp)
+    t_0 = np.array(t) - np.mean(t)
     lc = np.array(lc)
     if plot:
         fig, axs = plt.subplots(2,1)
@@ -805,28 +822,37 @@ def correct_trends(t, lc, fit_linear=True, fit_expramp=True, fit_quadratic=True,
         axs[1].scatter(t,lc,color='k',alpha=0.25,label="input")
     if fit_quadratic:
         result = least_squares(quadratic_residuals_,
-                               np.array([0,0,1]),
-                               args=(t,lc))
-        trend = result.x[0]*(t**2) + result.x[1]*t + result.x[2]
+                               np.array([1,1,1]),
+                               args=(t_corr,lc_corr))
+        print('quadratic fit: ', result.x)
+        trend = result.x[0]*(t_0**2) + result.x[1]*t_0 + result.x[2]
         if plot:
-            axs[0].plot(t,trend,color='green',label='quadratic')
+            axs[0].plot(t,trend,color='green',ls='--',label='quadratic')
         lc /= trend
+        trend = result.x[0]*(t_corr**2) + result.x[1]*t_corr + result.x[2]
+        lc_corr /= trend
     if fit_linear:
         result = least_squares(linear_residuals_,
-                               np.array([0,1]),
-                               args=(t,lc))
-        trend = result.x[0]*t + result.x[1]
+                               np.array([1,1]),
+                               args=(t_corr,lc_corr))
+        print('linear fit: ', result.x)
+        trend = result.x[0]*t_0 + result.x[1]
         if plot:
-            axs[0].plot(t,trend,color='red',label='linear')
+            axs[0].plot(t,trend,color='red',ls=':',label='linear')
         lc /= trend
+        trend = result.x[0]*t_corr + result.x[1]
+        lc_corr /= trend
     if fit_expramp:
         result = least_squares(expramp_residuals_,
-                               np.array([1,0]),
-                               args=(t,lc))
-        trend = result.x[0]*np.exp(result.x[1]*t)
+                               np.array([0,1,1]),
+                               args=(t_corr,lc_corr))
+        print('exp-ramp fit: ', result.x)
+        trend = result.x[0]*np.exp(result.x[1]*t_0)
         if plot:
-            axs[0].plot(t,trend,color='blue',label='exp-ramp')
+            axs[0].plot(t,trend,color='blue',ls='-.',label='exp-ramp')
         lc /= trend
+        trend = result.x[0]*np.exp(result.x[1]*t_corr)
+        lc_corr /= trend
     if plot:
         axs[1].scatter(t,lc,color='k',label='processed')
         axs[0].legend(loc='upper right')
@@ -837,17 +863,17 @@ def correct_trends(t, lc, fit_linear=True, fit_expramp=True, fit_quadratic=True,
 
 def linear_residuals_(fit,x,flx):
     model = fit[0]*x + fit[1]
-    residuals = [(i/j) - 1 for i, j in zip(flx,model)]
+    residuals = (flx-model)**2#[(i-j) for i, j in zip(flx,model)]
     return residuals
 
 def expramp_residuals_(fit,x,flx):
     model = fit[0]*np.exp(fit[1]*x)
-    residuals = [(i/j) - 1 for i, j in zip(flx,model)]
+    residuals = (flx-model)**2#[(i-j) for i, j in zip(flx,model)]
     return residuals
 
 def quadratic_residuals_(fit,x,flx):
     model = fit[0]*(x**2) + fit[1]*x + fit[2]
-    residuals = [(i/j) - 1 for i, j in zip(flx,model)]
+    residuals = (flx-model)**2#[(i-j) for i, j in zip(flx,model)]
     return residuals
     
 def plot_Allan(t, lc, indices_of_oot, outfile, outdir):
@@ -868,17 +894,22 @@ def plot_Allan(t, lc, indices_of_oot, outfile, outdir):
                   
     # Now repeatedly bin the residuals down and see how they evolve.
     bins = [i for i in range(2,len(res)//10)] # size of the bins
+    bins_retain = []
     rms = []
     stderr = []
     for N in bins:        
         b_res, b_t = time_bin(res, t, N)
-        b_rms = get_rms(b_res)
-        b_std = get_GST(b_res, res_std, N)
-        
-        rms.append(b_rms)
-        stderr.append(b_std)
+        try:
+            b_rms = get_rms(b_res)
+            b_std = get_GST(b_res, res_std, N)
+            
+            rms.append(b_rms)
+            stderr.append(b_std)
+            bins_retain.append(N)
+        except:
+            pass
     f = 1e-6 # normalization factor
-
+    bins = bins_retain
     # And plot everything.
     fig, ax = plt.subplots(figsize=(5, 5))
     ax.plot(bins, [i/f for i in stderr], c='red', lw=2.0, label="Gaussian Std Err")
@@ -899,25 +930,31 @@ def get_GST(r, res_std, N):
 
 def est_err(x,flx):
     result = least_squares(residuals_,
-                           np.array([1,1,0,1]),
+                           np.array([np.mean(flx),1,0,0,x[0]]),
                            args=(x,flx,False))
     
     res = residuals_(result.x,x,flx,True)
     return res
 
 def residuals_(fit,x,flx,snip):
-    rs = rampslope(x,fit[0],fit[1],fit[2],fit[3])
+    rs = rampslope(x,fit[0],fit[1],fit[2],fit[3],fit[4])
     residuals = flx-rs
     # Remove outlier points.
     if snip:
+        #fig, ax = plt.subplots(2,1)
+        #ax[0].scatter(x,flx, color='k')
+        #ax[0].plot(x,rs,color='red')
+        #ax[1].scatter(x,residuals,color='k')
+        #plt.show()
+        #plt.close()
         res_mean = np.mean(residuals)
         res_sig = np.std(residuals)
         outliers = np.where(np.abs(residuals-res_mean) > 3*res_sig)[0]
         residuals = np.delete(residuals, outliers)
     return residuals
 
-def rampslope(x,a,b,c,d):
-    return a*np.exp(b*x) + c*x + d
+def rampslope(x,a,b,c,d,e):
+    return a*np.exp(b*(x-e)) + c*x + d
 
 def plot_curve(t, lc, event_type, title, outfile, outdir, expected_depth=None):
     '''
