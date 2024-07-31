@@ -1,0 +1,24 @@
+# Juniper config file for launching Stage 1: JWST Detector1Pipeline and 1/f Corrections
+
+# Setup for Stage 1
+toplevel_dir    './files'                                   # Directory where you want your files to be stored after Stage 1 has run. This is where the *rateints.fits files will be stored.
+verbose         2                                           # Int from 0 to 2. 0 = print nothing. 1 = print some statements. 2 = print every action.
+show_plots      2                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
+save_plots      2                                           # Int from 0 to 2. 0 = save nothing. 1 = save some plots. 2 = save all plots.
+
+# Step 1: JWST Detector1Pipeline front-end
+files_loc       './'                                        # str. This is where the *uncal.fits files that you want to operate on are. Download them before Stage 1!
+files_rename    'name'                                      # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').
+
+
+# Step 2: Group-level background subtraction
+do_glbs         True                                        # bool. Whether to perform this step. Strongly recommend you do - glbs can reduce scatter by thousands of ppm!
+
+# Step 3: JWST Detector1Pipeline back-end
+# WIP!
+
+# Step 4: NSClean
+do_NSClean      True                                        # bool. Whether to perform this step. Cuts down further on systematic noise.
+# WIP!
+
+# ENDPARSE
