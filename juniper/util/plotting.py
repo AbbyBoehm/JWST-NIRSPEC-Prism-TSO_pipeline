@@ -23,5 +23,6 @@ def img(array, aspect=1, title=None, vmin=None, vmax=None, norm=None, verbose=2)
             print("Plot normalization unspecified or unrecognized, defaulting to 'linear'...")
         norm = 'linear'
     im = ax.imshow(array, aspect=aspect, norm=norm, origin="lower", vmin=vmin, vmax=vmax)
+    plt.colorbar(mappable=im,fraction=min(0.5/aspect,0.15))
     ax.set_title(title)
     return fig, ax, im
