@@ -4,6 +4,6 @@ os.environ['CRDS_PATH'] = './crds_cache/jwst_ops'
 os.environ['CRDS_SERVER_URL'] = 'https://jwst-crds.stsci.edu'
 
 PACKAGEDIR = os.path.abspath(os.path.dirname(__file__))
-all = ['pipeline',]
+all = ['run_pipeline',]
 
-from juniper import pipeline
+from .pipeline import run_pipeline
