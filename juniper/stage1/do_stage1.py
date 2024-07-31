@@ -19,8 +19,8 @@ def do_stage1(filepaths, outfiles, outdir, steps):
 
     if steps["highlevel"]["verbose"] == 2:
         print("Stage 1 will operate on the following files:")
-        for i in filepaths:
-            print(i)
+        for i, f in enumerate(filepaths):
+            print(i, f)
     
     # Check tqdm and plotting requests.
     time_step, time_ints = tqdm_translate(steps["highlevel"]["verbose"])
@@ -35,7 +35,7 @@ def do_stage1(filepaths, outfiles, outdir, steps):
     # Start iterating.
     for filepath, outfile in tqdm(zip(filepaths, outfiles),
                                   desc='Processing Stage 1...',
-                                  disable=time_step):
+                                  disable=(not time_step)):
         # Wrap the first steps of Detector1Pipeline.
         datamodel = wrap_stage1jwst.wrap_front_end(filepath, steps["pipeline"])
 

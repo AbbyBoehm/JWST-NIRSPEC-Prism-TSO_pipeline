@@ -33,7 +33,7 @@ def glbs_all(datamodel, inpt_dict):
     # Iterate over frames.
     for i in tqdm(range(data.shape[0]),
                   desc = "Removing 1/f noise from integrations...",
-                  disable=time_step): # for each integration
+                  disable=(not time_step)): # for each integration
         # Obtain the mask that hides the trace using a cleaned version of the very last group in this integration.
         trace_mask = np.zeros_like(data[i,-1,:,:])
         if inpt_dict["mask"]:
@@ -43,7 +43,7 @@ def glbs_all(datamodel, inpt_dict):
             
         for g in tqdm(range(data.shape[1]),
                       desc = "Correcing integration {}, group {}...".format(i, g),
-                      disable=time_ints): # for each group
+                      disable=(not time_ints)): # for each group
             # Correct 1/f noise with group-level background subtraction for that group.
             datamodel.data[i,g,:,:], background = glbs_one(data[i,g,:,:],
                                                            bckg_rows=inpt_dict["kernel"],

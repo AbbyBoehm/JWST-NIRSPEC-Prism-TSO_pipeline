@@ -1,72 +1,99 @@
+from tqdm import tqdm
+
 import numpy as np
+import xarray as xr
 from astropy.io import fits
 
 from jwst import datamodels as dm
 
-def stitch_files(files):
+def stitch_files(files, time_step, verbose):
     """Reads all supplied files and stitches them together into a single array.
 
     Args:
         files (lst of str): filepaths to files that are to be loaded.
+        time_ints (bool): whether to report timing with tqdm.
+        verbose (int): from 0 to 2. How much logging to do.
 
     Returns:
-        np.array: loaded data.
+        xarray: loaded data.
     """
-    if "postprocessed" in files[0]:
-        print("Reading post-processed files, adjusting outputs accordingly...")
-        # Reading a postprocessed file, adjust strategy!
-        for i, file in enumerate(files):
-            print("Attempting to locate file: " + file)
-            fitsfile = dm.open(file)
-            print("Loaded the file " + file + " successfully.")
+    # Log.
+    if verbose >= 1:
+        print("Stitching data files together for post-processing...")
+    
+    if verbose == 2:
+        print("Will stitch together the following files:")
+        for i, f in enumerate(files):
+            print(i, f)
 
-            # Need to retrieve the wavelength object, science object, and DQ object from this.
-            if i == 0:
-                segments = fitsfile.data
-                errors = fitsfile.err
-                segstarts = [np.shape(fitsfile.data)[0]]
-                wavelengths = [fitsfile.wavelength]
-                dqflags = fitsfile.dq
-                times = fitsfile.int_times["int_mid_MJD_UTC"]
-            else:
-                segments = np.concatenate([segments, fitsfile.data], 0)
-                errors = np.concatenate([errors, fitsfile.err], 0)
-                segstarts.append(np.shape(fitsfile.data)[0] + sum(segstarts))
-                wavelengths.append(fitsfile.wavelength)
-                dqflags = np.concatenate([dqflags, fitsfile.dq], 0)
-                times = np.concatenate([times, fitsfile.int_times["int_mid_MJD_UTC"]], 0)
-            
-            fitsfile.close()
-            
-            with fits.open(file) as f:
-                frames_to_reject = f["REJECT"].data
-            
-            print("Retrieved segments, wavelengths, DQ flags, and times from file: " + file)
-            print("Closing file and moving on to next one...")
-        return segments, errors, segstarts, wavelengths, dqflags, times, frames_to_reject
-    else:
-        for i, file in enumerate(files):
-            print("Attempting to locate file: " + file)
-            fitsfile = dm.open(file)
-            print("Loaded the file " + file + " successfully.")
+    # Initialize some empty lists.
+    data, err, wav, dq = [], [], [], [] # the data_vars of the xarray
+    time = [] # the coords of the xarray
+    int_count = [] # the attributes of the array
 
-            # Need to retrieve the wavelength object, science object, and DQ object from this.
-            if i == 0:
-                segments = fitsfile.data
-                errors = fitsfile.err
-                segstarts = [np.shape(fitsfile.data)[0]]
-                wavelengths = [fitsfile.wavelength]
-                dqflags = fitsfile.dq
-                times = fitsfile.int_times["int_mid_MJD_UTC"]
-            else:
-                segments = np.concatenate([segments, fitsfile.data], 0)
-                errors = np.concatenate([errors, fitsfile.err], 0)
-                segstarts.append(np.shape(fitsfile.data)[0] + sum(segstarts))
-                wavelengths.append(fitsfile.wavelength)
-                dqflags = np.concatenate([dqflags, fitsfile.dq], 0)
-                times = np.concatenate([times, fitsfile.int_times["int_mid_MJD_UTC"]], 0)
+    # Read in each file.
+    for file in tqdm(files,
+                     desc = 'Stitching files...',
+                     disable=(not time_step)):
+        data_i, err_i, int_count_i, wav_i, dq_i, time_i = read_one_datamodel(file)
+        # 1D and 2D objects append right away
+        int_count.append(int_count_i)
+        time.append(time_i)
 
-            print("Retrieved segments, wavelengths, DQ flags, and times from file: " + file)
-            print("Closing file and moving on to next one...")
-            fitsfile.close()
-        return segments, errors, segstarts, wavelengths, dqflags, times
+        # 3D objects may need a little more nuance
+        for i in range(data.shape[0]):
+            data.append(data_i[i])
+            err.append(err_i[i])
+            wav.append(wav_i[i])
+            dq.append(dq_i[i])
+
+    # Now convert to xarray.
+    segment = xr.Dataset(data_vars=dict(
+                                    data=(["time", "x", "y"], data),
+                                    err=(["time", "x", "y"], err),
+                                    dq = (["time", "x", "y"], dq),
+                                    wav = (["time", "x", "y"], wav),
+                                    ),
+                        coords=dict(
+                                time = (["time"], time),
+                                ),
+                        attrs = dict(
+                                integrations = int_count,
+                                )
+    )
+
+    # Log.
+    if verbose >= 1:
+        print("Files stitched together into xarray.")
+    
+    return segment
+    
+def read_one_datamodel(file):
+    """Read one .fits file as a datamodel and return its attributes.
+
+    Args:
+        file (str): path to the .fits file you want to read out.
+
+    Returns:
+        np.array, np.array, int, np.array, np.array, np.array: the data, errors, integration count, wavelength solution, data quality array, and exposure mid-times.
+    """
+    with dm.open(file) as f:
+         data = f.data
+         err = f.err
+         int_count = data.shape[0]
+         wav = f.wavelength
+         dq = f.dq
+         t = f.int_times["int_mid_MJD_UTC"]
+    return data, err, int_count, wav, dq, t
+
+def read_one_postproc(file):
+    """Read one post-processing .nc file and return its attributes.
+
+    Args:
+        file (str): path to the .nc file you want to read out.
+
+    Returns:
+        xarray: xarray representing one post-processed fits file.
+    """
+    segment = ':D'
+    return segment
