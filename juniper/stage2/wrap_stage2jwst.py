@@ -1,17 +1,17 @@
 import time
 
 from jwst.pipeline import Spec2Pipeline
-
-from revised_utils import timer
+from util.diagnostics import timer
 
 def wrap(filepath,outfile,outdir,steps):
-    '''
-    Wrapper for jwst Spec2Pipeline. Does nothing else.
+    """Wrapper for jwst Spec2Pipeline.
 
-    :param filepath: str. A path to the *rateints.fits file you want to operate on.
-    :param steps: dict. A dictionary containing instructions for all stages of the Spec2Pipeline.
-    :return: outfile saved to outdir. Routine returns no callables.
-    '''
+    Args:
+        filepath (str): a path to the *rateints.fits file you want to operate on.
+        outfile (str): what to rename the output files to. Can be None to keep the default name.
+        outdir (str): where to save the output *calints.fits files.
+        steps (dict): A dictionary containing instructions for all stages of the Spec2Pipeline.
+    """
     # Time this step if asked.
     if steps["timer"]:
         t0 = time.time()
@@ -22,4 +22,3 @@ def wrap(filepath,outfile,outdir,steps):
     
     if steps["timer"]:
         timer(time.time()-t0,None,None,None)
-    return None

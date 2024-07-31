@@ -26,19 +26,18 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         s1_config = read_config.read_config(s1_config)
 
         # Process Stage 1.
-        for f in glob.glob(s1_config["files_loc"]):
-            s1_result = wrap_stage1jwst.wrap_front_end(f,
-                                                       inpt_dict=s1_config["wrap_front_end"])
-            
-            if s1_config["do_glbs"]:
-                s1_result.data = group_level_bckg_sub.glbs_all(s1_result.data,
-                                                               inpt_dict=s1_config["glbs"])
-            
-            wrap_stage1jwst.wrap_back_end(s1_result,
-                                          inpt_dict=s1_config["wrap_back_end"],
-                                          outfile=s1_config["files_rename"],
-                                          outdir=s1_config["toplevel_dir"])
-            
-            if s1_config["do_NSClean"]:
-                # WIP! Needs to open the wrap_back_end files and NSClean them, then save them again.
-                pass
+        do_stage1(s1_config["files_loc"],
+                  [s1_config["rename"] for i in s1_config["files_loc"]],
+                  s1_config["toplevel_dir"],
+                  s1_config)
+        
+        # Write the config dictionary out as a copy.
+        config_outdir = os.path.join(s1_config["toplevel_dir"],"configuration")
+        if not os.path.exists(config_outdir):
+            os.makedirs(config_outdir)
+        write_config.write_config(s1_config,
+                                  run_name=None,
+                                  stage=1,
+                                  outdir=config_outdir)
+    
+    ### Run Juniper Stage 2: ??
