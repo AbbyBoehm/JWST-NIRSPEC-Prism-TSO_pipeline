@@ -2,18 +2,156 @@
 
 # Setup for Stage 2
 toplevel_dir    ''                                          # Top-level directory for all files in this project. The input and output files should be here.
-input           'uncal'                                     # The sub-directory relative to the top-level directory where your input *rateints.fits files are.
-output          'rates'                                     # The sub-directory relative to the top-level directory where your output *calints.fits files will be saved.
+input           'rates'                                     # The sub-directory relative to the top-level directory where your input *rateints.fits files are.
+output          'calints'                                   # The sub-directory relative to the top-level directory where your output *calints.fits files will be saved
+run_name        None                                        # str or None. You can use this to open sub-folders in the output folder if you wanted to rerun (e.g. have output/run1 and output/run2).
 CRDS_PATH       None                                        # str or None. If you already have a crds_cache directory, point to its absolute path here. Otherwise, a crds_cache will be opened in the current working directory.
 max_cores       'half'                                      # integer or 'quarter', 'half', 'all'. How many cores to use for multiprocessing.
 verbose         2                                           # Int from 0 to 2. 0 = print nothing. 1 = print some statements. 2 = print every action.
 show_plots      2                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
 save_plots      2                                           # Int from 0 to 2. 0 = save nothing. 1 = save some plots. 2 = save all plots.
+diagnostics     'calints/diagnostics'                       # str. If save_plots >= 1, diagnostic plots will be written to this folder.
 
 # Step 1: JWST Spec2Pipeline wrapper
 rename          'name'                                      # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').
+do_assign_wcs   True                                        # bool. Whether to perform this step in jwst Spec2Pipeline.
+slit_y_low      -0.55                                       # float. Lower edge of NIRSpec slit.
+slit_y_high     0.55                                        # float. Upper edge of NIRSpec slit.
+
+do_selfcal      False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to NIRSpec IFU and MIRI MRS.
+flagfrac_lower  0.001                                       # float. Fraction of pixels to flag as outliers on low-flux side of smooth-subtracted image.
+flagfrac_upper  0.001                                       # float. Fraction of pixels to flag as outliers on high-flux side of smooth-subtracted image.
+kernel_size     15                                          # int. Kernel to use for median filtering.
+save_flagged    False                                       # bool. Whether to save flagged background exposures to fits files.
+
+do_msaflag      False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to NIRSpec MOS and IFU.
+
+do_jwstNSClean  False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies to all NIRSpec modes.
+#                                                             This build of NSClean was not designed for exoplanet work so it tends to not play well with exoplanet time series, we recommend you use our build instead.
+mask_trace      True                                        # bool. Whether to mask the trace as defined by the WCS bounding boxes.
+n_sigma         5                                           # float. Sigma for kicking outliers from the background region.
+save_mask       False                                       # bool. Whether to save the trace mask.
+user_mask       None                                        # str or None. User-supplied trace mask path.
+
+do_imprint      False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to NIRSpec MOS and IFU.
+
+do_background   True                                        # bool. Whether to perform this step in jwst Spec2Pipeline.
+bkg_sigma       3                                           # float. Sigma clipping limit.
+maxiters        None                                        # int or None. If int, limits how many iterations are performed.
+save_bkg        False                                       # bool. Whether to save the combined image used to subtract the background.
+wfss_mmag_bkg   False                                       # float or None. For WFSS only. Magnitude limit for extracting sources.
+
+do_extract_2d   True                                        # bool. Whether to perform this step in jwst Spec2Pipeline. Applies to all NIRSpec modes.
+slit_name       None                                        # str or None. If str, extract from a specific slit. If None, try to extract from all known slits.
+tsgrism_height  100                                         # int. Cross-dispersion aperture size.
+wfss_halfheight 100                                         # int. WFSS cross-dispersion aperture half-size.
+wfss_mmag_ext   None                                        # float or None. For WFSS only. Magnitude limit for extracting sources.
+wfss_nbright    1000                                        # int. For WFSS only. Number of brightest sources to extract.
+extract_orders  []                                          # list of orders to extract. If None, uses wavelengthrange reference file instead.
+grism_objects   []                                          # list of jwst.transforms.models.GrismObject.
+
+do_srctype      True                                        # bool. Whether to perform this step in jwst Spec2Pipeline.
+source_type_st  None                                        # str ("POINT" or "EXTENDED") or None. Can be used to override Spec2Pipeline's judgment.
+
+do_wavecorr     True                                        # bool. Whether to perform this step in jwst Spec2Pipeline. Applies to NIRSpec FS and MOS.
+
+do_master_bckg  False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to NIRSpec MOS.
+user_bckg       None                                        # str or None. User-supplied background fle.
+save_bckg       False                                       # bool. Whether to save the background that is computed.
+force_subtract  False                                       # bool. If True, overrides step's built-in judgment for whether this step is to be done.
+output_model    True                                        # bool. Whether to determine filename from meta.
+
+do_straylight   False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to MIRI MRS.
+
+do_flat_field   True                                        # bool. Whether to perform this step in jwst Spec2Pipeline. Flat field sometimes makes it worse if the flat file is from early cycles.
+save_int_flat   False                                       # bool. Whether to save flat field constructed by this step.
+user_flat       None                                        # str or None. User-supplied flat field file.
+inverse_ff      False                                       # bool. Whether flat field should be multiplied in (True) instead of the usual dividing out (False).
+
+do_fringe       False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to MIRI MRS.
+
+do_pathloss     False                                       # bool. Whether to perform this step in jwst Spec2Pipeline.
+inverse_pl      False                                       # bool. Whether flat field should be multiplied in (True) instead of the usual dividing out (False).
+source_type_pl  None                                        # str ("POINT" or "EXTENDED") or None. Can be used to override Spec2Pipeline's judgment.
+user_slit_loc   None                                        # float or None. If float, offsets the target location along the dispersion direction.
+
+do_barshadow    False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to NIRSpec MOS.
+inverse_bar     False                                       # bool. Whether correction should be multiplied in (True) instead of the usual dividing out (False).
+source_type_bar None                                        # str ("POINT" or "EXTENDED") or None. Can be used to override Spec2Pipeline's judgment.
+
+do_wfss_contam  False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to NIRISS WFSS and NIRCam.
 
 # Step 2: Curvature correction
-do_correction   True                                        # Bool. Whether to perform this step, if it is needed (e.g. G395H data is curved but PRISM is not, so even if this is set to True, it will not apply to PRISM data).
+do_correction   True                                        # bool. Whether to perform this step, if it is needed (e.g. G395H data is curved but PRISM is not, so even if this is set to True, it will not apply to PRISM data).
+
+### This is the end of Juniper Stage 2, technically. If you do the steps after this, the outputs are such that Juniper Stages 3-6 are not designed to handle them.
+### If you intend to use Juniper Stages 3-6, leave all below as their defaults. If you don't intend to Juniper Stages 3-6, change things as you like.
+
+# Step 3 (optional): JWST Spec2Pipeline 1D extraction
+do_photom       False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Only needed if absolute photometry is necessary, which for exoplanets it often isn't.
+inverse_photom  False                                       # bool. Whether correction should be multiplied in (True) instead of the usual dividing out (False).
+source_type_pho None                                        # str ("POINT" or "EXTENDED") or None. Can be used to override Spec2Pipeline's judgment.
+mrs_time_corr   True                                        # bool. Whether to turn on the time and wavelength dependent corrections for MIRI MRS data.
+
+do_res_fringe   False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to MIRI MRS.
+ignore_min      None                                        # float. Min wavelength of regions to be ignored, as comma-separated list.
+ignore_max      None                                        # float. Max wavelength of regions to be ignored, as comma-separated list.
+
+do_pixelreplace False                                       # bool. Whether to perform this step in jwst Spec2Pipeline.
+algorithm       'fit_profile'                               # str. How to replace bad pixels.
+n_adj_cols      3                                           # int. Cross-dispersion columns to bin in 1D extraction.
+
+do_resamplespec False                                       # bool. Whether to perform this step in jwst Spec2Pipeline.
+pixfrac         1.0                                         # float. Fraction to shrink pixels by before drizzling.
+kernel          'square'                                    # str. Shape of kernel function for drizzling.
+pixel_ratio     1.0                                         # float. Ratio of input to output pixel.
+pixel_scale     None                                        # float. Absolute size of pixel in arcsec. Overrides pixel_ratio.
+rotation        None                                        # float. Angle of Y-axis relative to North.
+crpix           None                                        # tuple of float. x and y of reference pixel.
+crval           None                                        # tuple of float. RA and DEC of reference pixel.
+output_shape    None                                        # tuple of int. nx, ny shape of output array.
+output_wcs      ""                                          # str. ASDF file with GWCS.
+fillval         'NAN'                                       # str. Value to assign to zero-weighted pixels.
+weight_type     'ivm'                                       # str. Weighting type for each image.
+single          False                                       # bool. If True, resample images into separate outputs.
+blendheaders    True                                        # bool. If True, blends metadata of all input images into one.
+allowed_memory  None                                        # float. Fractional amount of free memory this routine can use.
+in_memory       True                                        # bool. If True, loads all images at once.
+
+do_cube_build   False                                       # bool. Whether to perform this step in jwst Spec2Pipeline.
+channel         'ALL'                                       # str. For MIRI only. Which channels to extract from.
+band            'ALL'                                       # str. For MIRI only. Which bands to extract from.
+grating         'ALL'                                       # str. For NIRSpec only. Which gratings to extract from.
+filter          'ALL'                                       # str. For NIRSpec only. Which filters to extract from.
+output_type     'Multi'                                     # str. Which IFU cubes to make.
+
+do_extract_1d   False                                       # bool. Whether to perform this step in jwst Spec2Pipeline.
+smoothing_len   None                                        # int or None. If int > 1 and odd, smoothes in dispersion direction with boxcar.
+bkg_fit         None                                        # str or None. Type of column background to fit.
+bkg_order       0                                           # int. Order of poly to fit to background. If bkg_fit is not 'poly', this is ignored.
+bkg_sigma_clip  3.0                                         # int. Sigma for removing outliers from background.
+log_increment   0                                           # int. How often to print a log statement.
+subtract_bkg    None                                        # float. If not None, this value is subtracted as the background.
+use_source_psn  None                                        # bool. Whether to shift the EXTRACT1D reference file source location.
+center_xy       None                                        # tuple of int. Override x, y circular aperture center.
+apply_apcorr    True                                        # bool. Whether to apply APERTURE correction.
+ifu_autocen     False                                       # bool. Whether to use DAOStarFinder to auto-centroid IFU sources.
+ifu_rfcorr      False                                       # bool. Whether to run MIRI MRS 1D fringe correction.
+ifu_set_srctype None                                        # str. Override source type.
+ifu_rscale      2                                           # int. If not 2, rescales the extraction radius.
+ifu_covar_scale 1.0                                         # float. Factor to scale errors by.
+soss_atoca      True                                        # bool. If True, use ATOCA to treat order contam.
+soss_threshold  0.01                                        # float. Threshold for modelling traces.
+soss_n_os       2                                           # int. Oversampling factor for wavelength grid.
+soss_estimate   ''                                          # str. Estimate of target flux or model.
+soss_wvgrid_in  ''                                          # str. Can be None.
+soss_wvgrid_out ''                                          # str. Can be None.
+soss_rtol       1e-4                                        # float. Tolerance on pixel model.
+soss_max_grid   20000                                       # float. Maximum grid size.
+soss_transform  (None,None,None)                            # list of three floats. Rotation.
+soss_tikfac     None                                        # float. Tikhonov regularization factor.
+soss_width      40                                          # float. Width of aperture.
+soss_bad_pix    "model"                                     # str. How to handle bad pixels.
+soss_modelname  None                                        # str. If not None, saves ATOCA model output.
 
 # ENDPARSE

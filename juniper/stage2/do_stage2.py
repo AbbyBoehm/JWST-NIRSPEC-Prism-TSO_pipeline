@@ -2,9 +2,10 @@ import os
 from tqdm import tqdm
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate
+from juniper.config.translate_config import s2_to_pipeline, s2_to_curvecorrect
 from juniper.stage2 import wrap_stage2jwst, correct_curvature
 
-def do_stage2(filepaths, outfiles, outdir, steps):
+def do_stage2(filepaths, outfiles, outdir, steps, plot_dir):
     """Performs Stage 2 calibration on the given files.
 
     Args:
@@ -12,21 +13,22 @@ def do_stage2(filepaths, outfiles, outdir, steps):
         outfiles (list): lst of str. Names to give to the calibrated files.
         outdir (str): location of where to save the calibrated files to.
         steps (dict): instructions on how to run this stage of the pipeline. Loaded from the Stage 2 .berry files.
+        plot_dir (str): location to save diagnostic plots to.
     """
     # Log.
-    if steps["highlevel"]["verbose"] >= 1:
+    if steps["verbose"] >= 1:
         print("Juniper Stage 2 has initialized.")
 
-    if steps["highlevel"]["verbose"] == 2:
-        print("Stage 2 will operate on the following files:")
-        for i in filepaths:
-            print(i)
+    if steps["verbose"] == 2:
+        print("Stage 2 will operate and output to the following files:")
+        for i, f in enumerate(filepaths):
+            print(i, f, "->", outfiles[i])
     
     # Check tqdm and plotting requests.
-    time_step, time_ints = tqdm_translate(steps["highlevel"]["verbose"])
+    time_step, time_ints = tqdm_translate(steps["verbose"])
     # FIX : i'll figure this out later
-    plot_step, plot_ints = plot_translate(steps["highlevel"]["show_plots"])
-    save_step, save_plots = plot_translate(steps["highlevel"]["save_plots"])
+    plot_step, plot_ints = plot_translate(steps["show_plots"])
+    save_step, save_plots = plot_translate(steps["save_plots"])
     
     # Create the output directory if it does not yet exist.
     if not os.path.exists(outdir):
@@ -36,16 +38,20 @@ def do_stage2(filepaths, outfiles, outdir, steps):
     for filepath, outfile in tqdm(zip(filepaths, outfiles),
                                   desc='Processing Stage 2...',
                                   disable=(not time_step)):
+        # Build the pipeline dictionary.
+        s2_pipeline = s2_to_pipeline(steps)
         # Process Spec2Pipeline.
-        wrap_stage2jwst.wrap(filepath, steps["pipeline"])
+        wrap_stage2jwst.wrap(filepath, s2_pipeline)
 
         # Then curve-correct, if necessary.
-        if not steps["curve"]["skip"]:
-            correct_curvature.correct_curvature(outfile, outdir, steps["curve"])
+        s2_curvecorrect = s2_to_curvecorrect(steps)
+        s2_curvecorrect["diagnostic_plots"] = plot_dir
+        if steps["do_correction"]:
+            correct_curvature.correct_curvature("{}_calints.fits".format(outfile), outdir, s2_curvecorrect)
         
-        if steps["highlevel"]["verbose"] == 2:
-            print("One iteration complete. Output saved in", outdir, "as file name {}_calints.fits".format(outfile))
+        if steps["verbose"] == 2:
+            print("One iteration complete. Output saved in", outdir, "as file name {}.fits".format(outfile))
     
     # Log.
-    if steps["highlevel"]["verbose"] >= 1:
+    if steps["verbose"] >= 1:
         print("Juniper Stage 2 is complete.")
