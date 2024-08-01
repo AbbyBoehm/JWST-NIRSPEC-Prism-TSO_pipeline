@@ -4,6 +4,7 @@
 toplevel_dir    ''                                          # Top-level directory for all files in this project. The input and output files should be here.
 input           'uncal'                                     # The sub-directory relative to the top-level directory where your input *uncal.fits files are.
 output          'rates'                                     # The sub-directory relative to the top-level directory where your output *rateints.fits files will be saved.
+CRDS_PATH       None                                        # str or None. If you already have a crds_cache directory, point to its absolute path here. Otherwise, a crds_cache will be opened in the current working directory.
 max_cores       'half'                                      # integer or 'quarter', 'half', 'all'. How many cores to use for multiprocessing.
 verbose         2                                           # Int from 0 to 2. 0 = print nothing. 1 = print some statements. 2 = print every action.
 show_plots      2                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
