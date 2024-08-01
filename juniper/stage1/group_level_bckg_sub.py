@@ -46,7 +46,7 @@ def glbs_all(datamodel, inpt_dict):
                       disable=(not time_ints)): # for each group
             # Correct 1/f noise with group-level background subtraction for that group.
             datamodel.data[i,g,:,:], background = glbs_one(data[i,g,:,:],
-                                                           bckg_rows=inpt_dict["kernel"],
+                                                           bckg_rows=inpt_dict["rows"],
                                                            trace_mask=trace_mask)
     # Log.
     if inpt_dict["verbose"] >= 1:

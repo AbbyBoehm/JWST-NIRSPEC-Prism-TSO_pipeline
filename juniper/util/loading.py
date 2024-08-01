@@ -48,25 +48,25 @@ def stitch_files(files, time_step, verbose):
             dq.append(dq_i[i])
 
     # Now convert to xarray.
-    segment = xr.Dataset(data_vars=dict(
+    segments = xr.Dataset(data_vars=dict(
                                     data=(["time", "x", "y"], data),
                                     err=(["time", "x", "y"], err),
                                     dq = (["time", "x", "y"], dq),
                                     wav = (["time", "x", "y"], wav),
                                     ),
                         coords=dict(
-                                time = (["time"], time),
-                                ),
-                        attrs = dict(
-                                integrations = int_count,
-                                )
+                               time = (["time"], time),
+                               ),
+                        attrs=dict(
+                              integrations = int_count,
+                              )
     )
 
     # Log.
     if verbose >= 1:
         print("Files stitched together into xarray.")
     
-    return segment
+    return segments
     
 def read_one_datamodel(file):
     """Read one .fits file as a datamodel and return its attributes.

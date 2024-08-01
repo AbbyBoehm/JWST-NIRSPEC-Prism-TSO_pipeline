@@ -1,23 +1,66 @@
 # Juniper config file for launching Stage 1: JWST Detector1Pipeline and 1/f Corrections
 
 # Setup for Stage 1
-toplevel_dir    './files'                                   # Directory where you want your files to be stored after Stage 1 has run. This is where the *rateints.fits files will be stored.
+toplevel_dir    ''                                          # Top-level directory for all files in this project. The input and output files should be here.
+input           'uncal'                                     # The sub-directory relative to the top-level directory where your input *uncal.fits files are.
+output          'rates'                                     # The sub-directory relative to the top-level directory where your output *rateints.fits files will be saved.
+max_cores       'half'                                      # integer or 'quarter', 'half', 'all'. How many cores to use for multiprocessing.
 verbose         2                                           # Int from 0 to 2. 0 = print nothing. 1 = print some statements. 2 = print every action.
 show_plots      2                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
 save_plots      2                                           # Int from 0 to 2. 0 = save nothing. 1 = save some plots. 2 = save all plots.
 
-# Step 1: JWST Detector1Pipeline front-end
-files_loc       './'                                        # str. This is where the *uncal.fits files that you want to operate on are. Download them before Stage 1!
-files_rename    'name'                                      # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').
+# Step 1: JWST Detector1Pipeline
+rename          'name'                                      # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').
+do_group_scale  True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+do_dq_init      True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+do_saturation   True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+sat_growth      1                                           # int. If do_saturation is True, how far away saturation should be flagged from the initial flagged pixel, which helps account for bloom.
+do_refpix       True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+odd_even_col    True                                        # bool. Keyword of the refpix step. NIR data only.
+use_side_ref    True                                        # bool. Keyword of the refpix step.
+side_smooth_len 11                                          # bool. Keyword of the refpix step. Only applies if use_side_ref is True.
+side_gain       1.0                                         # bool. Keyword of the refpix step. Only applies if use_side_ref is True.
+odd_even_row    True                                        # bool. Keyword of the refpix step. MIR data only.
+ovr_corr_mit    3.0                                         # bool. Keyword of the refpix step. NIRSpec IRS2 mode only.
+pres_irs2_ref   False                                       # bool. Keyword of the refpix step. Always False for science operations, only ever True for some diagnostics or calibrations.
+do_linearity    True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+do_dark_current True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+dark_output     None                                        # str or None. If str, dark data will be saved with this name.
+avg_dark        None                                        # float or None. If float, it is the average dark current in e-/s and is used to calculate Poisson noise from dark current.
+do_jump         True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+rej_threshold   15                                          # float. The sigma threshold at which to flag a jump.
+three_group_rej 6                                           # float. The sigma threshold at which to flag a jump if you only have three groups.
+four_group_rej  5                                           # float. The sigma threshold at which to flag a jump if you only have four groups.
+flag_4          True                                        # bool. If True, flags the four adjacent pixels to a jump as also jumping.
+max_jump        200                                         # float. Limits neighbor flagging.
+min_jump        10                                          # float. Limits neighbor flagging.
+do_ramp_fitting True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+save_opt        False                                       # bool. Whether to save optional outputs from this step.
+opt_name        None                                        # str or None. If saving the optional outputs, what to name it.
+int_name        None                                        # str or None. If saving the optional outputs, what to name the per-integration product.
+suppress_one    True                                        # bool. Whether to suppress calculations when only one group is not fully saturated.
+do_gain_scale   True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
 
+# Step 1a: NIRSpec-specific steps
+do_superbias    True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+do_persistence  False                                       # bool. Whether to perform this step in jwst Detector1Pipeline. Does not apply to TSOs so usually we do not use this in exoplanetary sciences.
+do_charge_mig   False                                       # bool. Whether to perform this step in jwst Detector1Pipeline. Does not apply to TSOs so usually we do not use this in exoplanetary sciences.
+
+# Step 1b: MIRI-specific steps
+do_emicorr      False                                       # bool. Whether to perform this step in jwst Detector1Pipeline.
+do_firstframe   False                                       # bool. Whether to perform this step in jwst Detector1Pipeline.
+do_lastframe    False                                       # bool. Whether to perform this step in jwst Detector1Pipeline.
+do_reset        False                                       # bool. Whether to perform this step in jwst Detector1Pipeline.
+do_rscd         False                                       # bool. Whether to perform this step in jwst Detector1Pipeline.
 
 # Step 2: Group-level background subtraction
 do_glbs         True                                        # bool. Whether to perform this step. Strongly recommend you do - glbs can reduce scatter by thousands of ppm!
+glbs_sigma      3.0                                         # float. How aggressively to clean outliers from the background region during glbs.
+glbs_kernel     (31,1)                                      # tuple of odd ints. The cols x rows to span during filtering of the background. Ideally filter over many columns and just one row.
+glbs_mask       True                                        # bool. Whether to mask the trace while computing the background values. Best used with a curving trace.
+glbs_rows       [0,1,2,3,4,5,-6,-5,-4,-3,-2,-1]             # list of ints. Indices to use as the background. Best used with a straight trace.
 
-# Step 3: JWST Detector1Pipeline back-end
-# WIP!
-
-# Step 4: NSClean
+# Step 3: NSClean
 do_NSClean      True                                        # bool. Whether to perform this step. Cuts down further on systematic noise.
 # WIP!
 

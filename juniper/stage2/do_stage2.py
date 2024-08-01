@@ -35,7 +35,7 @@ def do_stage2(filepaths, outfiles, outdir, steps):
     # Start iterating.
     for filepath, outfile in tqdm(zip(filepaths, outfiles),
                                   desc='Processing Stage 2...',
-                                  disable=time_step):
+                                  disable=(not time_step)):
         # Process Spec2Pipeline.
         wrap_stage2jwst.wrap(filepath, steps["pipeline"])
 

@@ -48,7 +48,8 @@ def colbycol_bckg(data, bckg_rows=[], trace_mask=None):
          background_region = background_region[bckg_rows, :]
             
     # Define the median background in each column and extend to a full-size array.
-    background = np.ma.median(background_region, axis=0) # FIX : catch exception if whole column masked, replace with 0?
+    background = np.ma.median(background_region, axis=0)
+    #background = np.where(False, 0, background) # FIX: is this a good fix for catching all-masked cols?
     background = np.array([background,]*data.shape[2])
 
     # And remove background from data.

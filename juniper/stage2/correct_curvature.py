@@ -100,7 +100,7 @@ def fix_curvature(data, wvs, timer, show, save, verbose, outdir):
     shifted_data = np.empty_like(data)
     for i in tqdm(range(data.shape[0]),
                   desc='Correcting curvature in each frame...',
-                  disable=time_ints):
+                  disable=(not time_ints)):
         shifted_data[i,:,:] = roll_one_frame(data[i,:,:], rolls)
         if (plot_step or save_step):
             if ((not plot_ints and i == 0) or plot_ints or save_ints): # either if just plot/save the first frame, or plot/save all ints
