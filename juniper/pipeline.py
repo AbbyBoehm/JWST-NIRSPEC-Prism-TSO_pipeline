@@ -34,6 +34,11 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         # Find files.
         files = sorted(glob.glob(os.path.join(input_dir,"*uncal.fits")))
 
+        # Set up crds cache.
+        os.environ["CRDS_PATH"] = "./" # if no path to crds_cache defined, set it up in the cwdir
+        if s1_config["CRDS_PATH"]:
+            os.environ["CRDS_PATH"] = s1_config["CRDS_PATH"] # set path to CRDS cache if you already have on
+
         # Process Stage 1.
         do_stage1(files,
                   ['{}{}'.format(s1_config["rename"],i) for i, f in enumerate(files)],
