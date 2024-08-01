@@ -1,9 +1,9 @@
 import os
 from tqdm import tqdm
 
-from util.diagnostics import tqdm_translate, plot_translate
-from config.translate_config import s1_to_pipeline, s1_to_glbs, s1_to_NSClean
-from stage1 import group_level_bckg_sub, wrap_stage1jwst, NSClean
+from juniper.util.diagnostics import tqdm_translate, plot_translate
+from juniper.config.translate_config import s1_to_pipeline, s1_to_glbs, s1_to_NSClean
+from juniper.stage1 import group_level_bckg_sub, wrap_stage1jwst, NSClean
 
 def do_stage1(filepaths, outfiles, outdir, steps):
     """Performs Stage 1 calibration on the given files.
@@ -19,9 +19,9 @@ def do_stage1(filepaths, outfiles, outdir, steps):
         print("Juniper Stage 1 has initialized.")
 
     if steps["verbose"] == 2:
-        print("Stage 1 will operate on the following files:")
+        print("Stage 1 will operate and output to the following files:")
         for i, f in enumerate(filepaths):
-            print(i, f)
+            print(i, f, "->", outfiles[i])
     
     # Check tqdm and plotting requests.
     time_step, time_ints = tqdm_translate(steps["verbose"])

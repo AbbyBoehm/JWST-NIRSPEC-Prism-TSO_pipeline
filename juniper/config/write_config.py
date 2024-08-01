@@ -84,36 +84,7 @@ def Stage1_info():
                        "Step 3":[],
                        "Step 4":["do_NSCle"],
                        }
-    rename          'name'                                      # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').
-do_group_scale  True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
-do_dq_init      True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
-do_saturation   True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
-sat_growth      1                                           # int. If do_saturation is True, how far away saturation should be flagged from the initial flagged pixel, which helps account for bloom.
-do_refpix       True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
-odd_even_col    True                                        # bool. Keyword of the refpix step. NIR data only.
-use_side_ref    True                                        # bool. Keyword of the refpix step.
-side_smooth_len 11                                          # bool. Keyword of the refpix step. Only applies if use_side_ref is True.
-side_gain       1.0                                         # bool. Keyword of the refpix step. Only applies if use_side_ref is True.
-odd_even_row    True                                        # bool. Keyword of the refpix step. MIR data only.
-ovr_corr_mit    3.0                                         # bool. Keyword of the refpix step. NIRSpec IRS2 mode only.
-pres_irs2_ref   False                                       # bool. Keyword of the refpix step. Always False for science operations, only ever True for some diagnostics or calibrations.
-do_linearity    True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
-do_dark_current True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
-dark_output     None                                        # str or None. If str, dark data will be saved with this name.
-avg_dark        None                                        # float or None. If float, it is the average dark current in e-/s and is used to calculate Poisson noise from dark current.
-do_jump         True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
-rej_threshold   15                                          # float. The sigma threshold at which to flag a jump.
-three_group_rej 6                                           # float. The sigma threshold at which to flag a jump if you only have three groups.
-four_group_rej  5                                           # float. The sigma threshold at which to flag a jump if you only have four groups.
-flag_4          True                                        # bool. If True, flags the four adjacent pixels to a jump as also jumping.
-max_jump        200                                         # float. Limits neighbor flagging.
-min_jump        10                                          # float. Limits neighbor flagging.
-do_ramp_fitting True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
-save_opt        False                                       # bool. Whether to save optional outputs from this step.
-opt_name        None                                        # str or None. If saving the optional outputs, what to name it.
-int_name        None                                        # str or None. If saving the optional outputs, what to name the per-integration product.
-suppress_one    True                                        # bool. Whether to suppress calculations when only one group is not fully saturated.
-do_gain_scale   True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+    
     subsection_comments = {"Setup":["# Top-level directory for all files in this project. The input and output files should be here.",
                                     "# The sub-directory relative to the top-level directory where your input *uncal.fits files are.",
                                     "# The sub-directory relative to the top-level directory where your output *rateints.fits files will be saved.",

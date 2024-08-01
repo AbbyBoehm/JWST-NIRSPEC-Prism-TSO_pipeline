@@ -35,7 +35,7 @@ four_group_rej  5                                           # float. The sigma t
 flag_4          True                                        # bool. If True, flags the four adjacent pixels to a jump as also jumping.
 max_jump        200                                         # float. Limits neighbor flagging.
 min_jump        10                                          # float. Limits neighbor flagging.
-do_ramp_fitting True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
+do_ramp_fit     True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
 save_opt        False                                       # bool. Whether to save optional outputs from this step.
 opt_name        None                                        # str or None. If saving the optional outputs, what to name it.
 int_name        None                                        # str or None. If saving the optional outputs, what to name the per-integration product.

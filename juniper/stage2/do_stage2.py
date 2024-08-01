@@ -1,8 +1,8 @@
 import os
 from tqdm import tqdm
 
-from util.diagnostics import tqdm_translate, plot_translate
-from stage2 import wrap_stage2jwst, correct_curvature
+from juniper.util.diagnostics import tqdm_translate, plot_translate
+from juniper.stage2 import wrap_stage2jwst, correct_curvature
 
 def do_stage2(filepaths, outfiles, outdir, steps):
     """Performs Stage 2 calibration on the given files.
@@ -11,7 +11,7 @@ def do_stage2(filepaths, outfiles, outdir, steps):
         filepaths (list): list of str. Location of the files you want to correct. The files must be of type *_rateints.fits.
         outfiles (list): lst of str. Names to give to the calibrated files.
         outdir (str): location of where to save the calibrated files to.
-        steps (dict): instructions on how to run this stage of the pipeline. Contains keywords "highlevel", "pipeline", and "curve".
+        steps (dict): instructions on how to run this stage of the pipeline. Loaded from the Stage 2 .berry files.
     """
     # Log.
     if steps["highlevel"]["verbose"] >= 1:

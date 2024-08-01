@@ -1,9 +1,9 @@
 import os
 from tqdm import tqdm
 
-from util.diagnostics import tqdm_translate, plot_translate
-from util.loading import stitch_files
-from stage3 import reject_time, reject_space, reject_flagged, reject_moved
+from juniper.util.diagnostics import tqdm_translate, plot_translate
+from juniper.util.loading import stitch_files
+from juniper.stage3 import reject_time, reject_space, reject_flagged, reject_moved
 
 def do_stage3(filepaths, outfiles, outdir, steps):
     """Performs Stage 3 reduction on the given files.

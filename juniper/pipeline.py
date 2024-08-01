@@ -9,9 +9,11 @@ from juniper.util import *
 from juniper.stage1 import *
 from juniper.stage2 import *
 from juniper.stage3 import *
+'''
 from juniper.stage4 import *
 from juniper.stage5 import *
 from juniper.stage6 import *
+'''
 
 def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
     """Wrapper for the Juniper pipeline.
@@ -20,6 +22,8 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         config_folder (str): path to the folder that stores all config files.
         stages (tuple, optional): tuple of ints which specify the stages you want to run. Defaults to (1,2,3,4,5,6,).
     """
+    print("Juniper pipeline running with following stages:", stages)
+    print(".berry configuration files will be sourced from:", config_folder)
     ### Run Juniper Stage 1: JWST Detector1Pipeline and 1/f Corrections
     if 1 in stages:
         # Open the config dictionary.
@@ -35,13 +39,15 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         files = sorted(glob.glob(os.path.join(input_dir,"*uncal.fits")))
 
         # Set up crds cache.
-        os.environ["CRDS_PATH"] = "./" # if no path to crds_cache defined, set it up in the cwdir
+        os.environ["CRDS_PATH"] = "crds_cache" # if no path to crds_cache defined, set it up in the cwdir
         if s1_config["CRDS_PATH"]:
             os.environ["CRDS_PATH"] = s1_config["CRDS_PATH"] # set path to CRDS cache if you already have on
+        elif not os.path.exists("crds_cache"):
+            os.makedirs("crds_cache")
 
         # Process Stage 1.
         do_stage1(files,
-                  ['{}{}'.format(s1_config["rename"],i) for i, f in enumerate(files)],
+                  ['{}_f{}_rateints'.format(s1_config["rename"],i) for i, f in enumerate(files)],
                   output_dir,
                   s1_config)
         

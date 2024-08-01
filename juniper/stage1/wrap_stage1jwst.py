@@ -2,7 +2,7 @@ import time
 
 from jwst.pipeline import Detector1Pipeline
 
-from util.diagnostics import timer
+from juniper.util.diagnostics import timer
 
 def wrap_front_end(filepath, inpt_dict):
     '''
@@ -13,7 +13,7 @@ def wrap_front_end(filepath, inpt_dict):
     :return: JWST datamodel produced by Detector1Pipeline.
     '''
     # Time step, if asked.
-    if inpt_dict["timer"]:
+    if inpt_dict["verbose"] >= 1:
         t0 = time.time()
     
     # Log.
@@ -21,16 +21,24 @@ def wrap_front_end(filepath, inpt_dict):
         print("jwst pipeline Stage 1 front end processing...")
         
     # Copy dict and modify it.
-    front_end_steps = inpt_dict.copy
+    front_end_steps = inpt_dict.copy()
     for step in ("ramp_fit","gain_scale"):
         front_end_steps[step] = {"skip":True}
+    # Delete entries related to verbose, show_plots, and save_plots.
+    for key in ("verbose","show_plots","save_plots"):
+        front_end_steps.pop(key, None)
+
+    if inpt_dict["verbose"] == 2:
+        print("Detector1Pipeline front end running with the following arguments:")
+        for key in list(front_end_steps.keys()):
+            print(key, front_end_steps[key])
     
     # Process Detector1Pipeline front end.
     result = Detector1Pipeline.call(filepath,
                                     steps=front_end_steps)
     
     # Report time, if asked.
-    if inpt_dict["timer"]:
+    if inpt_dict["verbose"] >= 1:
         timer(time.time()-t0,None,None,None)
     return result
 
@@ -45,7 +53,7 @@ def wrap_back_end(datamodel, inpt_dict, outfile, outdir):
     :return: outfile saved to outdir. Routine returns no callables.
     '''
     # Time step, if asked.
-    if inpt_dict["timer"]:
+    if inpt_dict["verbose"] >= 1:
         t0 = time.time()
 
     # Log.
@@ -53,9 +61,17 @@ def wrap_back_end(datamodel, inpt_dict, outfile, outdir):
         print("jwst pipeline Stage 1 back end processing...")
     
     # Copy dict and modify it.
-    back_end_steps = inpt_dict.copy
+    back_end_steps = inpt_dict.copy()
     for step in ("group_scale","dq_init","saturation","superbias","refpix","linearity","dark_current","jump"):
         back_end_steps[step] = {"skip":True}
+    # Delete entries related to verbose, show_plots, and save_plots.
+    for key in ("verbose","show_plots","save_plots"):
+        back_end_steps.pop(key, None)
+    
+    if inpt_dict["verbose"] == 2:
+        print("Detector1Pipeline back end running with the following arguments:")
+        for key in list(back_end_steps.keys()):
+            print(key, back_end_steps[key])
     
     # Process Detector1Pipeline back end.
     result = Detector1Pipeline.call(datamodel,
@@ -63,6 +79,6 @@ def wrap_back_end(datamodel, inpt_dict, outfile, outdir):
                                     output_dir=outdir,
                                     steps=back_end_steps)
     
-    if inpt_dict["timer"]:
+    if inpt_dict["verbose"] >= 1:
         timer(time.time()-t0,None,None,None)
     return None

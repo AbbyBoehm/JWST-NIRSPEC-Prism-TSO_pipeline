@@ -3,9 +3,9 @@ from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 
-from util.diagnostics import tqdm_translate, plot_translate
-from util.cleaning import median_spatial_filter, colbycol_bckg, get_trace_mask
-from util.plotting import img
+from juniper.util.diagnostics import tqdm_translate, plot_translate
+from juniper.util.cleaning import median_spatial_filter, colbycol_bckg, get_trace_mask
+from juniper.util.plotting import img
 
 def glbs_all(datamodel, inpt_dict):
     """Performs group-level background subtraction on every group in the datamodel according to the instructions in inpt_dict.
@@ -42,7 +42,7 @@ def glbs_all(datamodel, inpt_dict):
                                                               kernel=inpt_dict["kernel"]))
             
         for g in tqdm(range(data.shape[1]),
-                      desc = "Correcing integration {}, group {}...".format(i, g),
+                      desc = "Correcing integration {}...".format(i),
                       disable=(not time_ints)): # for each group
             # Correct 1/f noise with group-level background subtraction for that group.
             datamodel.data[i,g,:,:], background = glbs_one(data[i,g,:,:],

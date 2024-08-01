@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from scipy import signal
 from astropy.io import fits
 
-from util.diagnostics import tqdm_translate, plot_translate, timer
-from util.plotting import img
+from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
+from juniper.util.plotting import img
 
 def correct_curvature(outfile, outdir, inpt_dict):
     """Checks if the file needs its curvature corrected, and if it does, corrects it.

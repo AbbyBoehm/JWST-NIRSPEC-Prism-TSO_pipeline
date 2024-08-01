@@ -50,7 +50,7 @@ def colbycol_bckg(data, bckg_rows=[], trace_mask=None):
     # Define the median background in each column and extend to a full-size array.
     background = np.ma.median(background_region, axis=0)
     #background = np.where(False, 0, background) # FIX: is this a good fix for catching all-masked cols?
-    background = np.array([background,]*data.shape[2])
+    background = np.array([background,]*data.shape[0])
 
     # And remove background from data.
     data -= background

@@ -2,7 +2,7 @@ from tqdm import tqdm
 
 import numpy as np
 
-from util.diagnostics import tqdm_translate, plot_translate
+from juniper.util.diagnostics import tqdm_translate, plot_translate
 
 def iterate_fixed(segments, inpt_dict):
     """Iterate a fixed number of times at specified sigmas to remove cosmic rays.

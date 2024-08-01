@@ -1,7 +1,8 @@
 import time
 
 from jwst.pipeline import Spec2Pipeline
-from util.diagnostics import timer
+
+from juniper.util.diagnostics import timer
 
 def wrap(filepath,outfile,outdir,steps):
     """Wrapper for jwst Spec2Pipeline.
@@ -13,12 +14,12 @@ def wrap(filepath,outfile,outdir,steps):
         steps (dict): A dictionary containing instructions for all stages of the Spec2Pipeline.
     """
     # Time this step if asked.
-    if steps["timer"]:
+    if steps["verbose"] >= 1:
         t0 = time.time()
 
     # Process Spec2Pipeline.
     result = Spec2Pipeline.call(filepath, output_file=outfile, output_dir=outdir,
                                 steps=steps)
     
-    if steps["timer"]:
+    if steps["verbose"] >= 1:
         timer(time.time()-t0,None,None,None)

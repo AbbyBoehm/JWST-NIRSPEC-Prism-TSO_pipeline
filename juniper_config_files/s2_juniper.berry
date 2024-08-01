@@ -1,13 +1,17 @@
 # Juniper config file for launching Stage 2: Wavelength Solution and Curvature Correction
 
 # Setup for Stage 2
-toplevel_dir    './files'                                   # Directory where your rates/* folder was created in Stage 1.
+toplevel_dir    ''                                          # Top-level directory for all files in this project. The input and output files should be here.
+input           'uncal'                                     # The sub-directory relative to the top-level directory where your input *rateints.fits files are.
+output          'rates'                                     # The sub-directory relative to the top-level directory where your output *calints.fits files will be saved.
+CRDS_PATH       None                                        # str or None. If you already have a crds_cache directory, point to its absolute path here. Otherwise, a crds_cache will be opened in the current working directory.
+max_cores       'half'                                      # integer or 'quarter', 'half', 'all'. How many cores to use for multiprocessing.
 verbose         2                                           # Int from 0 to 2. 0 = print nothing. 1 = print some statements. 2 = print every action.
 show_plots      2                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
 save_plots      2                                           # Int from 0 to 2. 0 = save nothing. 1 = save some plots. 2 = save all plots.
 
 # Step 1: JWST Spec2Pipeline wrapper
-files_rename    'name'                                      # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').
+rename          'name'                                      # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').
 
 # Step 2: Curvature correction
 do_correction   True                                        # Bool. Whether to perform this step, if it is needed (e.g. G395H data is curved but PRISM is not, so even if this is set to True, it will not apply to PRISM data).
