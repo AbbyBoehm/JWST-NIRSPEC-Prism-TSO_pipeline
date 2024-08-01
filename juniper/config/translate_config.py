@@ -28,6 +28,9 @@ def s1_to_pipeline(s1_config):
                                    "dark_output":s1_config["dark_output"],
                                    "average_dark_current":s1_config["avg_dark"]}
     
+    s1_pipeline["charge_migration"] = {"skip":(not s1_config["do_charge_mig"]),
+                                       "signal_threshold":s1_config["signal_thres"]}
+    
     s1_pipeline["jump"] = {"skip":(not s1_config["do_jump"]),
                            "rejection_threshold":s1_config["rej_threshold"],
                            "three_group_rejection_threshold":s1_config["three_group_rej"],

@@ -62,7 +62,10 @@ def wrap_back_end(datamodel, inpt_dict, outfile, outdir):
     
     # Copy dict and modify it.
     back_end_steps = inpt_dict.copy()
-    for step in ("group_scale","dq_init","saturation","superbias","refpix","linearity","dark_current","jump"):
+    for step in ("group_scale","dq_init","saturation","superbias",
+                 "refpix","linearity","dark_current","jump",
+                 "persistence","emicorr","firstframe","lastframe",
+                 "reset","rscd","charge_migration"):
         back_end_steps[step] = {"skip":True}
     # Delete entries related to verbose, show_plots, and save_plots.
     for key in ("verbose","show_plots","save_plots"):
@@ -81,4 +84,5 @@ def wrap_back_end(datamodel, inpt_dict, outfile, outdir):
     
     if inpt_dict["verbose"] >= 1:
         timer(time.time()-t0,None,None,None)
-    return None
+    
+    return result

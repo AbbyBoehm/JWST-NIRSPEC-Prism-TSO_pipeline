@@ -48,7 +48,7 @@ def do_stage1(filepaths, outfiles, outdir, steps):
             datamodel = group_level_bckg_sub.glbs_all(datamodel, s1_glbs)
 
         # Wrap the last steps of Detector1Pipeline.
-        wrap_stage1jwst.wrap_back_end(datamodel, s1_pipeline, outfile, outdir)
+        result = wrap_stage1jwst.wrap_back_end(datamodel, s1_pipeline, outfile, outdir)
 
         # Perform NSClean background subtraction.
         if steps["do_NSClean"]:
@@ -56,7 +56,7 @@ def do_stage1(filepaths, outfiles, outdir, steps):
             NSClean.NSClean(filepath, s1_NSClean)
         
         if steps["verbose"] == 2:
-            print("One iteration complete. Output saved in", outdir, "as file name {}_rateints.fits".format(outfile))
+            print("One iteration complete. Output saved in", outdir, "as file name {}.fits".format(outfile))
     
     # Log.
     if steps["verbose"] >= 1:

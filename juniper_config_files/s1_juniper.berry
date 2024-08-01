@@ -46,6 +46,7 @@ do_gain_scale   True                                        # bool. Whether to p
 do_superbias    True                                        # bool. Whether to perform this step in jwst Detector1Pipeline.
 do_persistence  False                                       # bool. Whether to perform this step in jwst Detector1Pipeline. Does not apply to TSOs so usually we do not use this in exoplanetary sciences.
 do_charge_mig   False                                       # bool. Whether to perform this step in jwst Detector1Pipeline. Does not apply to TSOs so usually we do not use this in exoplanetary sciences.
+signal_thres    25000                                       # float. If charge migration is performed, this is the threshold at which a pixel gets flagged as DO_NOT_USE.
 
 # Step 1b: MIRI-specific steps
 do_emicorr      False                                       # bool. Whether to perform this step in jwst Detector1Pipeline.
