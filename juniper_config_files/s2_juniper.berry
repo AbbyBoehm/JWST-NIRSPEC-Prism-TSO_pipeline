@@ -26,8 +26,8 @@ save_flagged    False                                       # bool. Whether to s
 
 do_msaflag      False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to NIRSpec MOS and IFU.
 
-do_jwstNSClean  False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies to all NIRSpec modes.
-#                                                             This build of NSClean was not designed for exoplanet work so it tends to not play well with exoplanet time series, we recommend you use our build instead.
+# Note: The jwst Spec2Pipeline build of NSClean was not designed for exoplanetary sciences and may misbehave if you use it.
+do_jwstnsclean  False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies to all NIRSpec modes.
 mask_trace      True                                        # bool. Whether to mask the trace as defined by the WCS bounding boxes.
 n_sigma         5                                           # float. Sigma for kicking outliers from the background region.
 save_mask       False                                       # bool. Whether to save the trace mask.
@@ -84,8 +84,8 @@ do_wfss_contam  False                                       # bool. Whether to p
 # Step 2: Curvature correction
 do_correction   True                                        # bool. Whether to perform this step, if it is needed (e.g. G395H data is curved but PRISM is not, so even if this is set to True, it will not apply to PRISM data).
 
-### This is the end of Juniper Stage 2, technically. If you do the steps after this, the outputs are such that Juniper Stages 3-6 are not designed to handle them.
-### If you intend to use Juniper Stages 3-6, leave all below as their defaults. If you don't intend to Juniper Stages 3-6, change things as you like.
+# This is the end of Juniper Stage 2, technically. If you do the steps after this, the outputs are such that Juniper Stages 3-6 are not designed to handle them.
+# If you intend to use Juniper Stages 3-6, leave all below as their defaults. If you don't intend to Juniper Stages 3-6, change things as you like.
 
 # Step 3 (optional): JWST Spec2Pipeline 1D extraction
 do_photom       False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Only needed if absolute photometry is necessary, which for exoplanets it often isn't.

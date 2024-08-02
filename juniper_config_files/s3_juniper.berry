@@ -1,12 +1,51 @@
 # Juniper config file for launching Stage 3: Reduction
 
 # Setup for Stage 3
-toplevel_dir    './files'                                   # Directory where your cal/* folder was created in Stage 2.
+toplevel_dir    'WD1856M'                                   # Top-level directory for all files in this project. The input and output files should be here.
+input           'calints'                                   # The sub-directory relative to the top-level directory where your input *calints.fits files are.
+output          'reduced'                                   # The sub-directory relative to the top-level directory where your output *reduced.fits files will be saved
+run_name        None                                        # str or None. You can use this to open sub-folders in the output folder if you wanted to rerun (e.g. have output/run1 and output/run2).
+CRDS_PATH       None                                        # str or None. If you already have a crds_cache directory, point to its absolute path here. Otherwise, a crds_cache will be opened in the current working directory.
+max_cores       'half'                                      # integer or 'quarter', 'half', 'all'. How many cores to use for multiprocessing.
 verbose         2                                           # Int from 0 to 2. 0 = print nothing. 1 = print some statements. 2 = print every action.
-show_plots      2                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
-save_plots      2                                           # Int from 0 to 2. 0 = save nothing. 1 = save some plots. 2 = save all plots.
+show_plots      0                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
+save_plots      1                                           # Int from 0 to 2. 0 = save nothing. 1 = save some plots. 2 = save all plots.
+diagnostics     'reduced/diagnostics'                       # str. If save_plots >= 1, diagnostic plots will be written to this folder.
 
-# Step 1: ??
+# Step 1: Mask flagged pixels
+reject_flagged  True                                        # bool. Whether to mask pixels that have been flagged by the jwst pipeline as seen in the data quality array.
+skip_flags      []                                          # list. If there are any flags in the jwst pipeline that you want to disregard (e.g. flag value 4, JUMP_DET), put them in here.
+flag_replace    None                                        # str 'space', str 'time', or None. The method to use for replacing flagged pixels. 'space' spatially filters the bad pixel, 'time' replaces with the median in time, and None leaves as masked.
+flag_sigma      3.0                                         # float. If replacement is 'space', the sigma to use when filtering bad pixels.
+flag_kernel     (31,1)                                      # tuple of odd int. If replacement is 'space', the kernel to use when filtering bad pixels.
+
+# Step 2: Mask outliers in time
+reject_time     True                                        # bool. Whether to mask pixels detected as being outliers in time.
+time_method     'fixed'                                     # str. Method for replacing outliers in time. Options are 'fixed' for fixed number of iterations, or 'free' for iterating until no outliers found.
+time_replace    'all'                                       # str. Options are 'all' (to replace with median in all time), int (to replace with median of adjacent int points), or None (to leave as masked with no replacement).
+
+# Step 2a: Fixed iteration time outlier rejection
+fixed_sigmas    [10,10]                                     # list of float. len(fixed_sigmas) is how many iterations are performed, and each float is the sigma threshold at that step.
+
+# Step 2b: Free iteration time outlier rejection
+free_sigma      5                                           # float. The sigma threshold to iterate at until outliers at this level are no longer found.
+free_cutoff     100                                         # int or None. If int, stop iterating at this threshold. Good for preventing the code from getting stuck in a forever loop, which can happen if the replacement method fails to adequately replace outliers.
+
+# Step 3: Mask outliers in space
+reject_space    True                                        # bool. Whether to mask pixels detected as being outliers in space.
+space_method    'led'                                       # str. Options are 'led' (Laplacian Edge Detection, see van Dokkum 2001) or 'smooth' (median filtering).
+
+# Step 3a: Laplacian Edge Detecion space outlier rejection
 # WIP!
+
+# Step 3b: Spatial smoothing space outlier rejection
+space_sigma     3.0                                         # float. The sigma to use when filtering bad pixels.
+space_kernel    (31,1)                                      # tuple of odd int. The kernel to use when filtering bad pixels.
+
+# Step 4: Track x, y displacement of trace in space
+track_disp      True                                        # bool. Whether to track frame motion in the dispersion direction.
+reject_disp     True                                        # bool. Whether to reject framess which show significant motion in the dispersion direction.
+track_spatial   True                                        # bool. Whether to track frame motion in the spatial or cross-dispersion direction.
+reject_spatial  True                                        # bool. Whether to reject framess which show significant motion in the spatial or cross-dispersion direction.
 
 # ENDPARSE
