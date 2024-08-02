@@ -112,7 +112,7 @@ def s2_to_pipeline(s2_config):
                                      "kernel_size":s2_config["kernel_size"],
                                      "save_flagged":s2_config["save_flagged"]} 
     
-    s2_pipeline["NSClean"] = {"skip":(not s2_config["do_jwstNSClean"]),
+    s2_pipeline["nsclean"] = {"skip":(not s2_config["do_jwstnsclean"]),
                               "mask_spectral_regions":s2_config["mask_trace"],
                               "n_sigma":s2_config["n_sigma"],
                               "save_mask":s2_config["save_mask"],
@@ -166,6 +166,30 @@ def s2_to_pipeline(s2_config):
                 "fringe","wfss_contam"):
         s2_pipeline[key] = {"skip":(not s2_config["do_{}".format(key)])}
 
+    return s2_pipeline
+
+def s2_clean_dict(s2_pipeline, mode):
+    """Removes unneeded tags from s2_pipeline based on observing mode.
+    Allows for one universal s2_juniper.berry file to exist.
+
+    Args:
+        s2_pipeline (dict): instructions for running Spec2Pipeline.
+        mode (str): the instrument used to make the observations.
+
+    Returns:
+        dict: s2_pipeline with extraneous tags popped.
+    """
+    # FIX: need to learn what keys are needed in other modes.
+    if mode == 'NIRSPEC':
+        bad_keys = ('badpix_selfcal','msaflag','imprint','background',
+                    'master_background','straylight','fringe','barshadow',
+                    'wfss_contam','residual_fringe','cube_build')
+    elif mode == 'MIRI':
+        bad_keys = ('msaflag','nsclean','imprint','extract_2d',
+                    'master_background','wavecorr','pathloss','barshadow',
+                    'wfss_contam','pixel_replace','resample_spec')
+    for key in bad_keys:
+        s2_pipeline.pop(key, None)
     return s2_pipeline
 
 def s2_to_curvecorrect(s2_config):

@@ -1,8 +1,10 @@
 import os
 from tqdm import tqdm
 
+from astropy.io import fits
+
 from juniper.util.diagnostics import tqdm_translate, plot_translate
-from juniper.config.translate_config import s2_to_pipeline, s2_to_curvecorrect
+from juniper.config.translate_config import s2_to_pipeline, s2_to_curvecorrect, s2_clean_dict
 from juniper.stage2 import wrap_stage2jwst, correct_curvature
 
 def do_stage2(filepaths, outfiles, outdir, steps, plot_dir):
@@ -30,9 +32,11 @@ def do_stage2(filepaths, outfiles, outdir, steps, plot_dir):
     plot_step, plot_ints = plot_translate(steps["show_plots"])
     save_step, save_plots = plot_translate(steps["save_plots"])
     
-    # Create the output directory if it does not yet exist.
+    # Create the output directory if it does not yet exist, and plot directory if you want plots.
     if not os.path.exists(outdir):
         os.makedirs(outdir)
+    if (any([save_step, save_plots]) and not os.path.exists(plot_dir)):
+        os.makedirs(plot_dir)
 
     # Start iterating.
     for filepath, outfile in tqdm(zip(filepaths, outfiles),
@@ -40,17 +44,24 @@ def do_stage2(filepaths, outfiles, outdir, steps, plot_dir):
                                   disable=(not time_step)):
         # Build the pipeline dictionary.
         s2_pipeline = s2_to_pipeline(steps)
+
+        # Check observing mode and remove unneeded tags.
+        with fits.open(filepath) as f:
+            mode = f[0].header['INSTRUME']
+            s2_pipeline = s2_clean_dict(s2_pipeline, mode)
         # Process Spec2Pipeline.
-        wrap_stage2jwst.wrap(filepath, s2_pipeline)
+        wrap_stage2jwst.wrap(filepath, outfile, outdir, s2_pipeline)
 
         # Then curve-correct, if necessary.
-        s2_curvecorrect = s2_to_curvecorrect(steps)
+        s2_curvecorrect = {}
+        for key in ("verbose","show_plots","save_plots"):
+            s2_curvecorrect[key] = steps[key]
         s2_curvecorrect["diagnostic_plots"] = plot_dir
         if steps["do_correction"]:
-            correct_curvature.correct_curvature("{}_calints.fits".format(outfile), outdir, s2_curvecorrect)
+            correct_curvature.correct_curvature(outfile, outdir, s2_curvecorrect)
         
         if steps["verbose"] == 2:
-            print("One iteration complete. Output saved in", outdir, "as file name {}.fits".format(outfile))
+            print("One iteration complete. Output saved in", outdir, "as file name {}".format(outfile))
     
     # Log.
     if steps["verbose"] >= 1:

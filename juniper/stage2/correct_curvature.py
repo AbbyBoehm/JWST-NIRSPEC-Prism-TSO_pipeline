@@ -33,7 +33,7 @@ def correct_curvature(outfile, outdir, inpt_dict):
         t0 = time.time()
 
     # Set up the output file name.
-    output_file = os.path.join(outdir, outfile+"_calints.fits")
+    output_file = os.path.join(outdir, outfile+".fits")
     with fits.open(output_file) as file:
         grating = file[0].header['GRATING']
         if grating in ("G395M","G395H"):
@@ -107,6 +107,8 @@ def fix_curvature(data, wvs, timer, show, save, verbose, outdir):
                 fig, ax, im = img(shifted_data[i,:,:],
                                   aspect=20,
                                   title="Rolled frame {}".format(i),
+                                  vmin=0,
+                                  vmax=100,
                                   verbose=verbose)
                 if save_step:
                     plt.savefig(os.path.join(outdir,"S2_corrected_frame{}.png".format(i)))

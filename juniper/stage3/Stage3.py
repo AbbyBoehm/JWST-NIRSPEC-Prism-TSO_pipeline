@@ -1,4 +1,3 @@
-"""
 import os
 import glob
 from copy import deepcopy
@@ -542,4 +541,3 @@ def gaussian_source_track(segments, reject_dispersion_direction=True, reject_spa
                 skipped += 1
     print("%.0f integrations had source positions significantly off from the median position and will be rejected." % skipped)
     return reject_frames
-"""

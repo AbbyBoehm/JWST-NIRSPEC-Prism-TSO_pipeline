@@ -7,8 +7,9 @@ from juniper.util.diagnostics import tqdm_translate, plot_translate
 from juniper.util.cleaning import median_spatial_filter, colbycol_bckg, get_trace_mask
 from juniper.util.plotting import img
 
-def glbs_all(datamodel, inpt_dict):
+def glbs(datamodel, inpt_dict):
     """Performs group-level background subtraction on every group in the datamodel according to the instructions in inpt_dict.
+    Adapted from routine developed by Trevor Foote (tof2@cornell.edu).
 
     Args:
         datamodel (jwst.datamodel): A datamodel containing attribute .data, which is an np array of shape nints x ngroups x nrows x ncols, produced during wrap_front_end.
@@ -45,25 +46,11 @@ def glbs_all(datamodel, inpt_dict):
                       desc = "Correcing integration {}...".format(i),
                       disable=(not time_ints)): # for each group
             # Correct 1/f noise with group-level background subtraction for that group.
-            datamodel.data[i,g,:,:], background = glbs_one(data[i,g,:,:],
-                                                           bckg_rows=inpt_dict["rows"],
-                                                           trace_mask=trace_mask)
+            datamodel.data[i,g,:,:], background = colbycol_bckg(data[i,g,:,:],
+                                                                inpt_dict["rows"],
+                                                                trace_mask)
+    
     # Log.
     if inpt_dict["verbose"] >= 1:
         print("Group-level background subtraction complete.")
     return datamodel
-
-def glbs_one(data, bckg_rows=[], trace_mask=None):
-    """Performs 1/f subtraction on the given array.
-    Adapted from routine developed by Trevor Foote (tof2@cornell.edu).
-
-    Args:
-        data (np.array): 2D row x col array from jwst.datamodel.
-        bckg_rows (list, optional): list of integers which defines the background rows. Defaults to [].
-        trace_mask (np.ma.masked_array, optional): mask to hide trace pixels with. Defaults to None.
-
-    Returns:
-        np.array: data array with column-by-column noise removed, and background of that noise.
-    """
-    data, background = colbycol_bckg(data, bckg_rows, trace_mask)
-    return data, background
