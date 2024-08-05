@@ -73,7 +73,7 @@ def stitch_files(files, time_step, verbose):
                                ),
                         attrs=dict(
                               integrations = int_count,
-                              flagged_move = flagged,
+                              flagged = flagged,
                               )
     )
 
@@ -118,7 +118,7 @@ def read_one_postproc(file):
     dq = segment.dq.values
     time = segment.time.values
     disp = segment.disp.values
-    cdisp = segment.disp.values
+    cdisp = segment.cdisp.values
     flagged = segment.flagged
     return data, err, int_count, wav, dq, time, disp, cdisp, flagged
 
@@ -174,7 +174,7 @@ def save_s3_output(segments, disp_pos, cdisp_pos, moved_ints, outfiles, outdir):
                                ),
                         attrs=dict(
                               integrations = ints,
-                              flagged_move = moved_int,
+                              flagged = moved_int,
                               )
         )
 
@@ -196,6 +196,10 @@ def save_s4_output(oneD_spec, oneD_err, time, wav_sols, shifts, outfile, outdir)
         outfile (str): name of the output file.
         outdir (str): directory to which the .nc file will be saved to.
     """
+    # First, patch for missing shifts.
+    if len(shifts) == 0:
+        shifts = [0 for i in time]
+
     # Convert to xarray.
     spectra = xr.Dataset(data_vars=dict(
                                     spectrum=(["time", "wavelength"], oneD_spec),

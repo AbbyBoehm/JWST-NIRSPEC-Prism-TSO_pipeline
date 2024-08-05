@@ -27,8 +27,11 @@ poly_order      7                                           # int. Order of poly
 
 # Step 2: Align spectra
 align           True                                        # bool. Whether to align the extracted 1D spectra.
+trim_spec       80                                          # int. How many points to trim from the edges of the spectra. Useful for ensuring meeasured shifts are not dominated by the flux falloff at the edges.
+high_res_factor 0.0001                                      # float. How finely to interpolate spectra when aligning. The smaller this is, the finer the fit but the longer the runtime.
+trim_fit        80                                          # int. How many points to trim from the edges of the fit. Useful for ensuring meeasured shifts are not dominated by the flux falloff at the edges.
 
 # Step 3: Clean spectra
-sigma           3.5                                         # float. Sigma at which to detect a spectral outlier and replace it with the median in time.
+sigma           3.5                                         # float. Sigma at which to detect a spectral outlier and replace it with the median in time. Enter None to skip this step.
 
 # ENDPARSE

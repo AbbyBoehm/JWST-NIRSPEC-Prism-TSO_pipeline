@@ -5,7 +5,7 @@ import numpy as np
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 
-def clean_spectra(oneD_spec, inpt_dict):
+def clean_spec(oneD_spec, inpt_dict):
     """Compares all 1D spectra to a median spectra and replaces outliers
     with the median of that spectral point in time.
 
@@ -33,26 +33,24 @@ def clean_spectra(oneD_spec, inpt_dict):
     # Track cleaned spectra and load sigma.
     cleaned_specs = []
     sigma = inpt_dict["sigma"]
+
+    # Track outliers removed.
+    bad_spex_removed = 0
     
     # Iterate over spectra.
     for i in tqdm(range(oneD_spec.shape[0]),
                   desc='Cleaning spectral outliers...',
-                  ):
-        # Track outliers removed.
-        bad_spex_removed = 0
-
+                  disable=(not time_ints)):
         # Iteration stop condition. As long as outliers are being found, we have to keep iterating.
         outlier_found = True
         while outlier_found:
-            # Define median spectrum in time and extend its size to include all time.
+            # Define median spectrum in time.
             med_spec = np.median(oneD_spec,axis=0)
-            med_spec = np.array([med_spec,]*oneD_spec.shape[0])
             # Get standard deviation of each point.
             std_spec = np.std(oneD_spec,axis=0)
-            std_spec = np.array([std_spec,]*oneD_spec.shape[0])
 
             # Flag outliers.
-            S = np.where(np.abs(oneD_spec-med_spec) > sigma*std_spec, 1, 0)
+            S = np.where(np.abs(oneD_spec[i,:]-med_spec) > sigma*std_spec, 1, 0)
 
             # Count outliers found.
             bad_spex_this_step = np.count_nonzero(S)
@@ -63,7 +61,18 @@ def clean_spectra(oneD_spec, inpt_dict):
                 outlier_found = False
             
             # Correct outliers and loop once more.
-            oneD_spec = np.where(S == 1, med_spec, oneD_spec)
-        print("1D spectral cleaning complete. Removed %.0f spectral outliers." % bad_spex_removed)
-        cleaned_specs.append(oneD_spec)
+            oneD_spec[i,:] = np.where(S == 1, med_spec, oneD_spec[i,:])
+        cleaned_specs.append(oneD_spec[i,:])
+
+    # Log.
+    if inpt_dict["verbose"] >= 1:
+        print("Spectra cleaned of outliers.")
+    
+    if inpt_dict["verbose"] == 2:
+        print("Removed %.0f spectral outliers from spectra." % bad_spex_removed)
+    
+    # Report time, if asked.
+    if time_step:
+        timer(time.time()-t0,None,None,None)
+
     return np.array(cleaned_specs)

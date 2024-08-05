@@ -38,7 +38,7 @@ def align(oneD_spec, oneD_err, wav_sols, inpt_dict):
 
     # Define template spectrum as the median in time and get fit parameters.
     med_spec = np.median(oneD_spec, axis=0)
-    cpix = np.arange(med_spec.shape[1])
+    cpix = np.arange(med_spec.shape[0])
     tspc = inpt_dict["trim_spec"]
     hrf = inpt_dict["high_res_factor"]
     tfit = inpt_dict["trim_fit"]
@@ -58,15 +58,15 @@ def align(oneD_spec, oneD_err, wav_sols, inpt_dict):
                   disable=(not time_ints)):
         shift_cpix = cpix + shifts[i]
         interp_spec = interp1d(cpix, oneD_spec[i,:], kind='linear', fill_value='extrapolate')
-        align_specs.append(interp_spec(shift_cpix))
+        align_spec.append(interp_spec(shift_cpix))
 
         interp_err = interp1d(cpix, oneD_err[i,:], kind='linear', fill_value='extrapolate')
         align_err.append(interp_err(shift_cpix))
 
-    align_specs = np.array(align_specs)
-    align_specs_err = np.array(align_specs_err)
+    align_spec = np.array(align_spec)
+    align_err = np.array(align_err)
 
-    return align_specs, align_specs_err, np.array(shifts)
+    return align_spec, align_err, np.array(shifts)
 
 def cross_correlate(spec, template, tspc, hrf, tfit):
     """Cross-correlates the spectrum with the template to find the shift.
@@ -85,6 +85,10 @@ def cross_correlate(spec, template, tspc, hrf, tfit):
     # Trim spec for getting the shift.
     x = np.copy(spec[tspc:-tspc])
     y = np.copy(template)
+
+    # Eliminate nan.
+    x = np.where(np.isnan(x),np.nanmedian(x),x)
+    y = np.where(np.isnan(y),np.nanmedian(y),y)
     
     # Interpolate to higher res.
     intrp_fx = interp1d(np.arange(0,x.shape[0]),x,kind="cubic")

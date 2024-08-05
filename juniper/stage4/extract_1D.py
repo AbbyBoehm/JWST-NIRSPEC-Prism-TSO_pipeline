@@ -2,6 +2,7 @@ import time
 from tqdm import tqdm
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 
@@ -34,9 +35,9 @@ def box(segments, inpt_dict):
         t0 = time.time()
 
     # Initialize arrays.
-    oneD_spec = np.empty_like((segments.data.shape[0],segments.data.shape[2])) # it has shape nints x ncols
-    oneD_err = np.empty_like((segments.data.shape[0],segments.data.shape[2])) # same shape as oneD_spec
-    wav_sols = np.empty_like((segments.data.shape[0],segments.data.shape[2])) # same shape as oneD_spec
+    oneD_spec = np.empty((segments.data.shape[0],segments.data.shape[2])) # it has shape nints x ncols
+    oneD_err = np.empty((segments.data.shape[0],segments.data.shape[2])) # same shape as oneD_spec
+    wav_sols = np.empty((segments.data.shape[0],segments.data.shape[2])) # same shape as oneD_spec
 
     # And populate.
     for i in tqdm(range(oneD_spec.shape[0]),
@@ -52,8 +53,10 @@ def box(segments, inpt_dict):
         mask = np.zeros_like(d)
         mask = np.where(np.isnan(w),1,mask) # if the wavelength solution is nan, mask the pixel
         if inpt_dict["wavelengths"]:
-            # Mask wavelengths we don't want, if ask.
-            mask = np.where((w < inpt_dict["wavelengths"][0] or w > inpt_dict["wavelengths"][1]),1,mask)
+            # Mask wavelengths that are too short.
+            mask = np.where(w < inpt_dict["wavelengths"][0],1,mask)
+            # And wavelengths that are too long.
+            mask = np.where(w > inpt_dict["wavelengths"][1],1,mask)
 
         if inpt_dict["mask_bad_pix"]:
             # Mask pixels that were flagged by the data quality array.

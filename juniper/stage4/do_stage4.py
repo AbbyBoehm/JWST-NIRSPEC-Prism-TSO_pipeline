@@ -49,14 +49,14 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
         oneD_spec, oneD_err, wav_sols = extract_1D.optimum(segments, steps)
 
     # Align spectra.
+    shifts = []
     if steps["align"]:
         oneD_spec, oneD_err, shifts = align_spec.align(oneD_spec, oneD_err,
                                                        wav_sols, steps)
         
     # Clean spectra.
-    if steps["sigmas"]:
-        oneD_spec = clean_spec.clean(oneD_spec, oneD_err,
-                                     wav_sols, steps)
+    if steps["sigma"]:
+        oneD_spec = clean_spec.clean_spec(oneD_spec, steps)
 
     # Save everything out.
     save_s4_output(oneD_spec, oneD_err, segments.time.values, wav_sols, shifts, outfile, outdir)
