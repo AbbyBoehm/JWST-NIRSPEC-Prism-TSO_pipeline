@@ -38,7 +38,7 @@ def mask_flags(segments, inpt_dict):
     # Turn dqflags into mask arrays, and add nan mask.
     dq_mask = np.empty_like(segments.dq.values)
     dq_mask[:, :, :] = np.where(segments.dq.values > 0, 1, 0)
-    dq_mask[np.isnan(segments)] = 1
+    dq_mask[np.isnan(segments.data.values)] = 1
 
     # The replacement method can be median time, median space, or None to leave as masked.
     if inpt_dict["flag_replace"] == 'time':
@@ -47,7 +47,7 @@ def mask_flags(segments, inpt_dict):
         # One filtered image as the median in time.
         replacement = np.median(segments.data.values,axis=0)
         # And replace.
-        segments.data = segments.data.where(dq_mask > 0, replacement, segments.data)
+        segments.data.values = segments.data.where(dq_mask > 0, replacement, segments.data.values)
 
     elif inpt_dict["flag_replace"] == 'space':
         if inpt_dict["verbose"] == 2:
@@ -59,13 +59,16 @@ def mask_flags(segments, inpt_dict):
                                                        inpt_dict["flag_sigma"],
                                                        inpt_dict["flag_kernel"])
         # And replace.
-        segments.data = segments.data.where(dq_mask > 0, replacement, segments.data)
+        segments.data.values = segments.data.where(dq_mask > 0, replacement, segments.data.values)
 
     else:
-        if inpt_dict["verbose"] == 2:
-            print("Masking flagged pixels using np.ma module...")
-        # No replacement specified, mask instead.
-        segments.data = np.ma.masked(segments.data, mask=dq_mask)
+        # No replacement. We ran this step purely to log JWST flags as 1s and 0s, and exclude flags of our choosing.
+        pass
+
+    # In the future, having JWST flag information stored in 1s or 0s rather than even integers will be helpful.
+    if inpt_dict["verbose"] == 2:
+        print("Converting dq array to 1s and 0s for later steps...")
+    segments.dq.values = np.where(segments.dq.values > 0, 1, 0)
 
     # Count how many pixels were replaced.
     if inpt_dict["verbose"] >= 1:

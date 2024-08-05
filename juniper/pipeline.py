@@ -9,8 +9,8 @@ from juniper.util import *
 from juniper.stage1 import *
 from juniper.stage2 import *
 from juniper.stage3 import *
-'''
 from juniper.stage4 import *
+'''
 from juniper.stage5 import *
 from juniper.stage6 import *
 '''
@@ -141,3 +141,38 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             config_name = "s3_{}_juniper.berry".format(run_name)
         shutil.copy(s3_config_path,os.path.join(config_outdir,config_name))
+    ### Run Juniper Stage 4: Reduction
+    if 4 in stages:
+        # Open the config dictionary.
+        s4_config_path = glob.glob(os.path.join(config_folder,'s4_*'))[0]
+        s4_config = read_config.read_config(s4_config_path)
+
+        # Set up run name and define directories.
+        run_name = s4_config["run_name"] # set up run_name for the .berry file
+        project_dir = s4_config["toplevel_dir"]
+        input_dir = os.path.join(project_dir,s4_config["input"])
+        output_dir = os.path.join(project_dir,s4_config["output"])
+        if run_name:
+            # Add an extra sub-folder to separate this run from other runs.
+            output_dir = os.path.join(project_dir,os.path.join(s4_config["output"],run_name))
+        diagnosticplots_dir = os.path.join(project_dir, s4_config["diagnostics"])
+
+        # Find files.
+        files = sorted(glob.glob(os.path.join(input_dir,"*reduced.nc")))
+        fnames = [str.split(f,sep='/')[-1] for f in files]
+        outfile = [str.replace(f,'_reduced.nc','_1Dspec') for f in fnames][0] # use default names and change reduced to 1Dspec, that's all.
+        if s4_config["rename"]:
+            # Set up new outfile names and also change reduced to 1Dspec.
+            outfile = '{}_1Dspec'.format(s4_config["rename"])
+
+        # Process Stage 4.
+        do_stage4(files,outfile,output_dir,s4_config,diagnosticplots_dir)
+
+        # Write the config dictionary out as a copy.
+        config_outdir = os.path.join(output_dir,"configuration")
+        if not os.path.exists(config_outdir):
+            os.makedirs(config_outdir)
+        config_name = "s4_juniper.berry"
+        if run_name:
+            config_name = "s4_{}_juniper.berry".format(run_name)
+        shutil.copy(s4_config_path,os.path.join(config_outdir,config_name))

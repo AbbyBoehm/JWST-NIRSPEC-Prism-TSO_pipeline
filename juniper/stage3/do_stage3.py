@@ -1,11 +1,12 @@
 import os
 from tqdm import tqdm
+import numpy as np
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate
-from juniper.util.loading import stitch_files
-from juniper.stage3 import reject_time, reject_space, reject_flagged, reject_moved, subtract_background
+from juniper.util.datahandling import stitch_files, save_s3_output
+from juniper.stage3 import reject_time, reject_space, reject_flagged, track_motion, subtract_background
 
-def do_stage3(filepaths, outfiles, outdir, steps):
+def do_stage3(filepaths, outfiles, outdir, steps, plot_dir):
     """Performs Stage 3 reduction on the given files.
 
     Args:
@@ -13,6 +14,7 @@ def do_stage3(filepaths, outfiles, outdir, steps):
         outfiles (list): lst of str. Names to give to the reduced files.
         outdir (str): location of where to save the reduced files to.
         steps (dict): instructions on how to run this stage of the pipeline.
+        plot_dir (str): location to save diagnostic plots to.
     """
     # Log.
     if steps["verbose"] >= 1:
@@ -40,15 +42,44 @@ def do_stage3(filepaths, outfiles, outdir, steps):
     
     # Mask data flags.
     if steps["reject_flagged"]:
-        # Build input dict.
-        inpt_dict = {}
-        for key in ("verbose","show_plots","save_plots","flag_replace",
-                    "flag_sigma","flag_kernel"):
-            inpt_dict[key] = steps[key]
-        segments = reject_flagged.mask_flags(segments, inpt_dict)
+        if steps["verbose"] >= 1:
+            print("JWST flags will be used for this run. Output data quality array will include JWST flag information.")
+        segments = reject_flagged.mask_flags(segments, steps)
+
+    # Alternatively, if JWST flags are not of interest, replace them.
+    if not steps["reject_flagged"]:
+        if steps["verbose"] >= 1:
+            print("JWST flags will be ignored for this run. Output data quality array will exclude JWST flag information.")
+        segments.dq.values = np.zeros_like(segments.dq.values)
         
     # Reject outliers in time.
     if steps["reject_time"]:
         if steps["time_method"] == "fixed":
-            segments = reject_time.iterate_fixed(segments, inpt_dict)
+            segments = reject_time.iterate_fixed(segments, steps)
+
+        if steps["time_method"] == "free":
+            segments = reject_time.iterate_free(segments, steps)
         
+    # Reject outliers in space.
+    if steps["reject_space"]:
+        if steps["space_method"] == "led":
+            segments = reject_space.led(segments, steps)
+        
+        if steps["space_method"] == "smooth":
+            segments = reject_space.smooth(segments, steps)
+
+    # Remove background signal.
+    if steps["subtract_bckg"]:
+        segments = subtract_background.subtract_background(segments, steps)
+
+    # Track motion of the trace.
+    disp_pos, cdisp_pos, moved_ints = [],[],[]
+    if any((steps["track_disp"],steps["track_spatial"])):
+        segments, disp_pos, cdisp_pos, moved_ints = track_motion.track_pos(segments, steps)
+
+    # Save everything out.
+    save_s3_output(segments, disp_pos, cdisp_pos, moved_ints, outfiles, outdir)
+
+    # Log.
+    if steps["verbose"] >= 1:
+        print("Juniper Stage 3 is complete.")

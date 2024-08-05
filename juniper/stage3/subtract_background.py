@@ -1,9 +1,10 @@
+import time
 from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-from juniper.util.diagnostics import tqdm_translate, plot_translate
+from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 from juniper.util.cleaning import median_spatial_filter, colbycol_bckg, get_trace_mask
 from juniper.util.plotting import img
 
@@ -28,17 +29,21 @@ def subtract_background(segments, inpt_dict):
     plot_step, plot_ints = plot_translate(inpt_dict["show_plots"])
     save_step, save_plots = plot_translate(inpt_dict["save_plots"])
 
+    # Time step, if asked.
+    if time_step:
+        t0 = time.time()
+
     # Obtain the mask that hides the trace using the median frame.
     trace_mask = np.zeros_like(segments.data[0,:,:])
-    if inpt_dict["mask"]:
-        trace_mask = get_trace_mask(median_spatial_filter(np.med(segments.data.values,axis=0),
+    if inpt_dict["trace_mask"]:
+        trace_mask = get_trace_mask(median_spatial_filter(np.median(segments.data.values,axis=0),
                                                           sigma=inpt_dict["bckg_sigma"],
                                                           kernel=inpt_dict["bckg_kernel"]))
 
     # Iterate over frames.
     for i in tqdm(range(segments.data.shape[0]),
                   desc = "Removing 1/f noise from calibrated integrations...",
-                  disable=(not time_step)): # for each integration
+                  disable=(not time_ints)): # for each integration
         # Correct 1/f noise with group-level background subtraction for that group.
         segments.data.values[i,:,:], background = colbycol_bckg(segments.data.values[i,:,:],
                                                                 inpt_dict["bckg_rows"],
@@ -46,4 +51,9 @@ def subtract_background(segments, inpt_dict):
     
     if inpt_dict["verbose"] >= 1:
         print("Integration-level background subtraction complete.")
+
+    # Report time, if asked.
+    if time_step:
+        timer(time.time()-t0,None,None,None)
+
     return segments

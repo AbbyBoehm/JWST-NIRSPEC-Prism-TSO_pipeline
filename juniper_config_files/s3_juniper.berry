@@ -1,7 +1,7 @@
 # Juniper config file for launching Stage 3: Reduction
 
 # Setup for Stage 3
-toplevel_dir    'WD1856M'                                   # Top-level directory for all files in this project. The input and output files should be here.
+toplevel_dir    ''                                          # Top-level directory for all files in this project. The input and output files should be here.
 input           'calints'                                   # The sub-directory relative to the top-level directory where your input *calints.fits files are.
 output          'reduced'                                   # The sub-directory relative to the top-level directory where your output *reduced.fits files will be saved
 run_name        None                                        # str or None. You can use this to open sub-folders in the output folder if you wanted to rerun (e.g. have output/run1 and output/run2).
@@ -11,9 +11,10 @@ verbose         2                                           # Int from 0 to 2. 0
 show_plots      0                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
 save_plots      1                                           # Int from 0 to 2. 0 = save nothing. 1 = save some plots. 2 = save all plots.
 diagnostics     'reduced/diagnostics'                       # str. If save_plots >= 1, diagnostic plots will be written to this folder.
+rename          None                                        # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').
 
 # Step 1: Mask flagged pixels
-reject_flagged  True                                        # bool. Whether to mask pixels that have been flagged by the jwst pipeline as seen in the data quality array.
+reject_flagged  True                                        # bool. Whether to mask pixels that have been flagged by the jwst pipeline as seen in the data quality array. If False, suppresses all jwst flags in the output data quality array.
 skip_flags      []                                          # list. If there are any flags in the jwst pipeline that you want to disregard (e.g. flag value 4, JUMP_DET), put them in here.
 flag_replace    None                                        # str 'space', str 'time', or None. The method to use for replacing flagged pixels. 'space' spatially filters the bad pixel, 'time' replaces with the median in time, and None leaves as masked.
 flag_sigma      3.0                                         # float. If replacement is 'space', the sigma to use when filtering bad pixels.
@@ -36,13 +37,25 @@ reject_space    True                                        # bool. Whether to m
 space_method    'led'                                       # str. Options are 'led' (Laplacian Edge Detection, see van Dokkum 2001) or 'smooth' (median filtering).
 
 # Step 3a: Laplacian Edge Detecion space outlier rejection
-# WIP!
+led_replace     True                                        # bool. If True, replaces outliers with a median filtered model. If False, leaves as masked.
+led_sigma       3.0                                         # float. The sigma to use when filtering bad pixels.
+led_factor      2                                           # int >= 2. The factor to use when subsampling the array. 2 works and is most computationally efficient.
+fine_structure  True                                        # bool. Whether to build the fine structure model, which further protects the trace from damage during LED.
+contrast_factor 5.0                                         # float. If building a fine structure model, this is effectively the sigma for that model.
 
 # Step 3b: Spatial smoothing space outlier rejection
+space_replace   True                                        # bool. If True, replaces outliers with a median filtered model. If False, leaves as masked.
 space_sigma     3.0                                         # float. The sigma to use when filtering bad pixels.
 space_kernel    (31,1)                                      # tuple of odd int. The kernel to use when filtering bad pixels.
 
-# Step 4: Track x, y displacement of trace in space
+# Step 4: Subtract background
+subtract_bckg   True                                        # bool. Whether to do integration-level background subtraction. If you ran NSClean in Stage 1, this step is likely unnecessary.
+trace_mask      True                                        # bool. Whether to mask the trace while performing background subtraction.
+bckg_rows       [0,1,2,-3,-2,-1]                            # list of int. Indices to define as the background region.
+bckg_sigma      3.0                                         # float. The sigma to use when filtering bad pixels.
+bckg_kernel     (31,1)                                      # tuple of odd int. The kernel to use when filtering bad pixels.
+
+# Step 5: Track x, y displacement of trace in space
 track_disp      True                                        # bool. Whether to track frame motion in the dispersion direction.
 reject_disp     True                                        # bool. Whether to reject framess which show significant motion in the dispersion direction.
 track_spatial   True                                        # bool. Whether to track frame motion in the spatial or cross-dispersion direction.

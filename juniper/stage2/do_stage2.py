@@ -4,7 +4,7 @@ from tqdm import tqdm
 from astropy.io import fits
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate
-from juniper.config.translate_config import s2_to_pipeline, s2_to_curvecorrect, s2_clean_dict
+from juniper.config.translate_config import s2_to_pipeline, s2_clean_dict
 from juniper.stage2 import wrap_stage2jwst, correct_curvature
 
 def do_stage2(filepaths, outfiles, outdir, steps, plot_dir):
