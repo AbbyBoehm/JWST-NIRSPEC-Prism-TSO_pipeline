@@ -25,6 +25,9 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
         for i, f in enumerate(filepaths):
             print(i, f)
         print("Output will be saved to {}.".format(outfile))
+
+    # Put the plot directory into the inpt_dict.
+    steps["plot_dir"] = plot_dir
     
     # Check tqdm and plotting requests.
     time_step, time_ints = tqdm_translate(steps["verbose"])
@@ -52,7 +55,7 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
     shifts = []
     if steps["align"]:
         oneD_spec, oneD_err, shifts = align_spec.align(oneD_spec, oneD_err,
-                                                       wav_sols, steps)
+                                                       wav_sols, segments.time.values, steps)
         
     # Clean spectra.
     if steps["sigma"]:

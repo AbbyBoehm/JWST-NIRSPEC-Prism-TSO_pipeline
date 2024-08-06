@@ -1,18 +1,22 @@
+import os
 import time
 from tqdm import tqdm
+
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from scipy import signal
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 
-def align(oneD_spec, oneD_err, wav_sols, inpt_dict):
+def align(oneD_spec, oneD_err, wav_sols, time, inpt_dict):
     """Aligns 1D spectra and uncertainties using cross-correlation.
 
     Args:
         oneD_spec (np.array): extracted 1D spectra.
         oneD_err (np.array): extracted 1D errors.
         wav_sols (np.array): wavelength solutions for each spectrum.
+        time (np.array): timestamps for each spectrum.
         inpt_dict (dict): instructions for running this step.
 
     Returns:
@@ -62,9 +66,47 @@ def align(oneD_spec, oneD_err, wav_sols, inpt_dict):
 
         interp_err = interp1d(cpix, oneD_err[i,:], kind='linear', fill_value='extrapolate')
         align_err.append(interp_err(shift_cpix))
+        
+        if (plot_ints or save_ints):
+            plt.plot(cpix, oneD_spec[i,:], color='darkred', alpha=0.5)
+            plt.plot(shift_cpix, align_spec[i], color='red',alpha=0.75)
+            plt.xlabel('position [pix]')
+            plt.ylabel('flux [a.u.]')
+            plt.title('Shifted spectrum {}'.format(i))
+            if save_ints:
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'shifted_spectrum_{}.png'.format(i)),
+                            dpi=300, bbox_inches='tight')
+            if plot_ints:
+                plt.show(block=True)
+            plt.close()
 
     align_spec = np.array(align_spec)
     align_err = np.array(align_err)
+
+    if (plot_step or save_step):
+        plt.scatter(time, shifts, color='midnightblue')
+        plt.xlabel('time [mjd]')
+        plt.ylabel('shift [pix]')
+        plt.title('Cross-correlation shifts')
+        if save_step:
+            plt.savefig(os.path.join(inpt_dict['plot_dir'],'spectral_shifts.png'),
+                        dpi=300, bbox_inches='tight')
+        if plot_step:
+            plt.show(block=True)
+        plt.close()
+
+        median_shift = np.nanmedian(shifts)
+        plt.scatter(time, shifts, color='midnightblue')
+        plt.xlabel('time [mjd]')
+        plt.ylabel('shift [pix]')
+        plt.title('Cross-correlation shifts')
+        plt.ylim(median_shift*0.8, median_shift*1.2)
+        if save_step:
+            plt.savefig(os.path.join(inpt_dict['plot_dir'],'spectral_shifts_zoom.png'),
+                        dpi=300, bbox_inches='tight')
+        if plot_step:
+            plt.show(block=True)
+        plt.close()
 
     return align_spec, align_err, np.array(shifts)
 

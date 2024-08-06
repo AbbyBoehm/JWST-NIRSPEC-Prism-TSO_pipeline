@@ -1,3 +1,4 @@
+import os
 import time
 from tqdm import tqdm
 
@@ -78,6 +79,25 @@ def box(segments, inpt_dict):
         # Apply the mask to the wavelengths and median it on columns.
         w = np.ma.masked_array(w, mask=mask)
         wav_sols[i,:] = np.ma.median(w,axis=0)
+
+        if (plot_step or save_step) and i==0:
+            plt.imshow(mask)
+            plt.title('1D extraction mask')
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'1D_extraction_mask_frame0.png'),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show(block=True)
+            plt.close()
+        if (plot_ints or save_ints):
+            plt.imshow(mask)
+            plt.title('1D extraction mask')
+            if save_ints:
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'1D_extraction_mask_frame{}.png'.format(i)),
+                            dpi=300, bbox_inches='tight')
+            if plot_ints:
+                plt.show(block=True)
+            plt.close()
 
     # Report time, if asked.
     if time_step:
