@@ -1,0 +1,89 @@
+# Juniper config file for launching Stage 5: Fitting
+
+# Setup for Stage 5
+toplevel_dir    ''                                          # Top-level directory for all files in this project. The input and output files should be here.
+input           'extracted'                                 # The sub-directory relative to the top-level directory where your input *1Dspec.nc files are.
+output          'fits'                                      # The sub-directory relative to the top-level directory where your output *fits.nc files will be saved.
+run_name        None                                        # str or None. You can use this to open sub-folders in the output folder if you wanted to rerun (e.g. have output/run1 and output/run2).
+CRDS_PATH       None                                        # str or None. If you already have a crds_cache directory, point to its absolute path here. Otherwise, a crds_cache will be opened in the current working directory.
+max_cores       'half'                                      # integer or 'quarter', 'half', 'all'. How many cores to use for multiprocessing.
+verbose         2                                           # Int from 0 to 2. 0 = print nothing. 1 = print some statements. 2 = print every action.
+show_plots      0                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
+save_plots      1                                           # Int from 0 to 2. 0 = save nothing. 1 = save some plots. 2 = save all plots.
+diagnostics     'fits/diagnostics'                          # str. If save_plots >= 1, diagnostic plots will be written to this folder.
+rename          None                                        # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').
+
+# Step 1: Decide how to treat multiple detectors
+detectors       'parallel'                                  # str. Choices are 'parallel' or 'join'. If multiple .nc files incorporating multiple detectors (e.g. nrs1+nrs2) were supplied, then we can either fit each detector's separate white light curve in parallel, or join the 1D spectra along the wavelength axis and then fit a single joined white light curve.
+
+# Step 2: Bin 1D spectra into light curves
+bin_method      'columns'                                   # str. Options are 'wavelengths' (to bin based on wavelength) or 'columns' (to bin every N columns).
+reject_bad_cols True                                        # bool. If True, masks contributions from columns deemed too noisy.
+bad_col_thres   0.001                                       # float. Used to control how aggressively we flag columns. The lower the number, the less noisiness we tolerate in our columns.
+save_curves_obj True                                        # bool. If True, saves the binned light curves a .nc file. Handy if you want to give your light curves to a friend who wants to try their own fitting routine.
+
+# Step 2a: Binning by wavelength
+wave_bins       np.arange(0.50,6.125,0.125)                 # Either an object that can be parsed as a list (i.e. [1,2,3] or np.arange(1,4,1)), or a str pointing to a text file containing the comma-separated bin edges as the first column.
+
+# Step 2b: Binning by columns
+n_columns       10                                          # int. How many columns each bin should contain.
+
+# Step 3: Light-curve fitting
+use_LSQ         True                                        # bool. Whether to use a linear least-squares estimator to refine initial parameter guesses and scale error bars to achieve unity chi2.
+LSQ_type        ''                                          # str. Scipy.optimize least-square algorithm to use.
+LSQ_tolerance   1e-10                                       # float. Tolerance for scipy LSQ algorithm. The smaller the number, the more tightly it will try to fight.
+LSQ_iter        None                                        # int. If not None, forces LSQ to stop after this many iterations.
+
+use_MCMC        True                                        # bool. Whether to use a Markov Chain Monte Carlo routine to fit parameters with posterior distribution.
+MCMC_chains     20                                          # int. How many chains to run in parallel.
+MCMC_steps      20000                                       # int. How many steps each chain should take before running.
+MCMC_burnin     0.20                                        # int > 1 or float < 1. If int, how many steps are regarded as burn-in, independent of MCMC_steps. If float, the fraction of MCMC_steps to be considered burn-in.
+
+# Step 3a: Setting up your star
+star_MH         0.00                                        # float. Metallicity of the star in dex.
+star_Teff       5800                                        # float. Effective temperature of the star.
+star_logg       4.5                                         # float. Log of the star's surface gravity g in cgs units.
+
+# Step 3b: Setting up your limb-darkening model
+LD_model        'nonlinear'                                 # str. Which kind of batman LD model to use. Options are 'uniform', 'linear', 'quadratic', 'square-root', 'logarithmic', 'exponential', 'power2' (from Morello et al. 2017), and 'nonlinear'.
+fit_LDs         False                                       # bool. Whether to treat LD coefficients as a free parameter. Only use if you have really good ingress/egress information, otherwise these will be really unconstrained
+LD_initialguess [0,0]                                       # list of float. The initial guess of LD coefficient to supply to the LD fitting routine. Only used if exotic_LD is False.
+fit_offset      [False,False]                               # bool. Whether to fit an offset to each LD coefficient in the model.
+LD_offset       [0,0]                                       # list of float. The initial guess of LD coefficient offset to supply to the LD fitting routine. Only used if fit_offset is True.
+
+# Step 3b i: Configuring ExoTiC-LD
+use_exotic      True                                        # bool. If True, ignore LD_initialguess and supply the values produced by ExoTiC-LD instead.
+ld_data_path    None                                        # str. Absolute path to your exotic_ld_data-#.#.# folder.
+ld_grid         "stagger"                                   # str. Which ExoTiC-LD model grid to use. Options are "1D"/"kurucz" or "3D"/"stagger", or None to supply a custom grid.
+custom_grid     None                                        # str. If ld_grid is None, use the grid at this path.
+interpolate     "trilinear"                                 # str. How to interpolate between different models in the grid. Options are "nearest" or "trilinear".
+instrument_mode "JWST_NIRSpec_Prism"                        # str. Specifies which instrument was used for the observations.
+
+# Step 3c: Setting up your planets
+event_type      'transit'                                   # str. Options are 'transit'/'primary' or 'eclipse'/'secondary'.
+n_planets       1                                           # int. How many planets to fit. Most observations have just one, but some have more than one!
+
+# Step 3c i: Planet parameters - make one copy of this entry per planet!
+rp              0.10                                        # float. Planet radius in terms of stellar radius, rp/r*.
+fp              0.0001                                      # float. Planet flux in terms of stellar flux, fp/f*.
+t_primary       0                                           # float. Mid-transit time in days.
+t_secondary     0                                           # float. Mid-eclipse time in days.
+period          3                                           # float. Orbital period in days.
+aor             10                                          # float. Orbital semimajor axis in terms of stellar radius, a/r*.
+inclination     90                                          # float. Orbital inclination in degrees.
+eccentricity    0                                           # float. Orbital eccentricity, usually assumed to be 0 for short-period planets.
+longitude_peri  0                                           # float. Orbital longitude of periastron in degrees.
+
+# Step 3d: Setting up your flares
+n_flare         0                                           # int. How many flares to fit. Most observations do not contain a flare, but if you see any, use this to specify how many the fitter should look for.
+
+# Step 3d i: Flare parameters - make one copy of this entry per flare!
+# WIP!
+
+# Step 3e: Setting up your systematics
+poly            True                                        # bool. Whether to fit a visit-long polynomial trend to the data.
+order           1                                           # float. The order of polynomial to fit.
+ydetrend        True                                        # bool. Whether to ydetrend. WIP!
+superbias_scale True                                        # bool. Whether to do superbias scaling. WIP!
+
+# ENDPARSE

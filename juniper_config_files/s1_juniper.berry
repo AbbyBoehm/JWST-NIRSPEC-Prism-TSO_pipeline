@@ -73,13 +73,14 @@ do_rscd         False                                       # bool. Whether to p
 
 # Step 2: Group-level background subtraction
 do_glbs         True                                        # bool. Whether to perform this step. Strongly recommend you do - glbs can reduce scatter by thousands of ppm!
+glbs_method     '1/f'                                       # str. Options are '1/f' (use column-by-column) or 'NSClean' (use NSClean method).
 glbs_sigma      3.0                                         # float. How aggressively to clean outliers from the background region during glbs.
 glbs_kernel     (31,1)                                      # tuple of odd ints. The cols x rows to span during filtering of the background. Ideally filter over many columns and just one row.
 glbs_mask       True                                        # bool. Whether to mask the trace while computing the background values. Best used with a curving trace.
 glbs_rows       [0,1,2,3,4,5,-6,-5,-4,-3,-2,-1]             # list of ints. Indices to use as the background. Best used with a straight trace.
 
 # Step 3: NSClean
-do_NSClean      True                                        # bool. Whether to perform this step. Cuts down further on systematic noise.
+do_NSClean      True                                        # bool. Whether to perform this step. Cuts down on systematic noise at the integration level.
 # WIP!
 
 # ENDPARSE

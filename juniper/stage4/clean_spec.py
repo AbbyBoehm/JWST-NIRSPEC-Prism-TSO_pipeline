@@ -1,7 +1,9 @@
+import os
 import time
 from tqdm import tqdm
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 
@@ -63,6 +65,32 @@ def clean_spec(oneD_spec, inpt_dict):
             # Correct outliers and loop once more.
             oneD_spec[i,:] = np.where(S == 1, med_spec, oneD_spec[i,:])
         cleaned_specs.append(oneD_spec[i,:])
+
+        if (plot_step or save_step) and i==0:
+            plt.plot(oneD_spec[i,:],color='midnightblue',alpha=0.5,ls='-')
+            plt.plot(cleaned_specs[i],color='orange',alpha=0.5,ls='--')
+            plt.xlabel('position [pix]')
+            plt.ylabel('flux [a.u.]')
+            plt.title('Cleaned spectrum 0')
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'cleaned_spec_0.png'),
+                            dpi=300,bbox_inches='tight')
+            if plot_step:
+                plt.show(block=True)
+            plt.close()
+
+        if (plot_ints or save_ints):
+            plt.plot(oneD_spec[i,:],color='midnightblue',alpha=0.5,ls='-')
+            plt.plot(cleaned_specs[i],color='orange',alpha=0.5,ls='--')
+            plt.xlabel('position [pix]')
+            plt.ylabel('flux [a.u.]')
+            plt.title('Cleaned spectrum {}'.format(i))
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'cleaned_spec_{}.png'.format(i)),
+                            dpi=300,bbox_inches='tight')
+            if plot_step:
+                plt.show(block=True)
+            plt.close()
 
     # Log.
     if inpt_dict["verbose"] >= 1:
