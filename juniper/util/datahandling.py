@@ -345,12 +345,13 @@ def stitch_spectra(files, detector_method, time_step, verbose):
                     print("If you are not using limb darkening models like ExoTiC-LD, this should not crash the code.")
                     print("(It will still cause some creative and surprising behavior though.)")
                     print("If you are using limb darkening models, please relaunch Stage 5 with the ''detectors'' keyword set to ''parallel''.")
+            
             # For every timestamp, we have to concatenate each 1D spectrum together as well as the wavelength solution.
             con_spec, con_err, con_waves = [], [], []
             time = np.array(time)
             time = np.median(time,axis=0) # should collapse time to roughly the mid-exposure times for all 1D spectra being joined
             shifts = np.array(shifts)
-            shifts = np.median(shifts,axis=0) # should be the same?
+            shifts = np.median(shifts,axis=0) # should be approximately the same since the detectors are parallel 
             for i in range(time.shape[0]):
                 # At every time stamp, grab each spectrum's 1D spec.
                 spec_i = spectra[0][i,:]

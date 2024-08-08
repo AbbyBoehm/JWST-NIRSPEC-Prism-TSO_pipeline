@@ -194,10 +194,10 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         # Find files.
         files = sorted(glob.glob(os.path.join(input_dir,"*1Dspec.nc")))
         fnames = [str.split(f,sep='/')[-1] for f in files]
-        outfile = [str.replace(f,'_1Dspec.nc','_lightcurves') for f in fnames][0] # use default names and change 1Dspec to lightcurves, that's all.
+        outfile = [str.replace(f,'_1Dspec.nc','_fits') for f in fnames][0] # use default name. There's only one file to be output here.
         if s5_config["rename"]:
-            # Set up new outfile names and also change 1Dspec to lightcurves.
-            outfile = '{}_lightcurves'.format(s5_config["rename"])
+            # Set up new outfile name.
+            outfile = '{}_fits'.format(s5_config["rename"])
 
         # Process Stage 5.
         do_stage5(files,outfile,output_dir,s5_config,diagnosticplots_dir)
