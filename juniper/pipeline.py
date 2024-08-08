@@ -10,10 +10,9 @@ from juniper.stage1 import *
 from juniper.stage2 import *
 from juniper.stage3 import *
 from juniper.stage4 import *
-'''
 from juniper.stage5 import *
-from juniper.stage6 import *
-'''
+#from juniper.stage6 import *
+
 
 def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
     """Wrapper for the Juniper pipeline.
@@ -141,7 +140,7 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             config_name = "s3_{}_juniper.berry".format(run_name)
         shutil.copy(s3_config_path,os.path.join(config_outdir,config_name))
-    ### Run Juniper Stage 4: Reduction
+    ### Run Juniper Stage 4: Extraction
     if 4 in stages:
         # Open the config dictionary.
         s4_config_path = glob.glob(os.path.join(config_folder,'s4_*'))[0]
@@ -176,3 +175,38 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             config_name = "s4_{}_juniper.berry".format(run_name)
         shutil.copy(s4_config_path,os.path.join(config_outdir,config_name))
+    ### Run Juniper Stage 5: Binning and Fitting
+    if 5 in stages:
+        # Open the config dictionary.
+        s5_config_path = glob.glob(os.path.join(config_folder,'s5_*'))[0]
+        s5_config = read_config.read_config(s5_config_path)
+
+        # Set up run name and define directories.
+        run_name = s5_config["run_name"] # set up run_name for the .berry file
+        project_dir = s5_config["toplevel_dir"]
+        input_dir = os.path.join(project_dir,s5_config["input"])
+        output_dir = os.path.join(project_dir,s5_config["output"])
+        if run_name:
+            # Add an extra sub-folder to separate this run from other runs.
+            output_dir = os.path.join(project_dir,os.path.join(s5_config["output"],run_name))
+        diagnosticplots_dir = os.path.join(project_dir, s5_config["diagnostics"])
+
+        # Find files.
+        files = sorted(glob.glob(os.path.join(input_dir,"*1Dspec.nc")))
+        fnames = [str.split(f,sep='/')[-1] for f in files]
+        outfile = [str.replace(f,'_1Dspec.nc','_lightcurves') for f in fnames][0] # use default names and change 1Dspec to lightcurves, that's all.
+        if s5_config["rename"]:
+            # Set up new outfile names and also change 1Dspec to lightcurves.
+            outfile = '{}_lightcurves'.format(s5_config["rename"])
+
+        # Process Stage 5.
+        do_stage5(files,outfile,output_dir,s5_config,diagnosticplots_dir)
+
+        # Write the config dictionary out as a copy.
+        config_outdir = os.path.join(output_dir,"configuration")
+        if not os.path.exists(config_outdir):
+            os.makedirs(config_outdir)
+        config_name = "s5_juniper.berry"
+        if run_name:
+            config_name = "s5_{}_juniper.berry".format(run_name)
+        shutil.copy(s5_config_path,os.path.join(config_outdir,config_name))

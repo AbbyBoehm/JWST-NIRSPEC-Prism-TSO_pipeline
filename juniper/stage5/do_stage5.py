@@ -1,10 +1,13 @@
 import os
+import glob
 from tqdm import tqdm
+
 import numpy as np
+import xarray as xr
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate
 from juniper.util.datahandling import stitch_spectra, save_s5_output
-from juniper.stage5 import *
+from juniper.stage5 import bin_light_curves
 
 def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
     """Performs Stage 5 fitting on the given files.
@@ -42,33 +45,23 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
         os.makedirs(plot_dir)
 
     # Open all files and decide how to handle them.
-    spectra = stitch_spectra(filepaths, steps["detectors"], time_step, steps["verbose"])
+    if steps["read_1D"]:
+        spectra = stitch_spectra(filepaths, steps["detectors"], time_step, steps["verbose"])
 
-    # Open all files and stitch them together.
-    segments = stitch_files(filepaths,
-                            time_step=time_step,
-                            verbose=steps["verbose"])
+        # Bin light curves.
+        light_curves = bin_light_curves.bin_light_curves(spectra, steps)
+
+        # Save light curves out.
+        light_curves.to_netcdf(os.path.join(outdir, 's5_lightcurves.nc'))
     
-    # Bin light curves.
-    if steps["extract_method"] == 'box':
-        oneD_spec, oneD_err, wav_sols = extract_1D.box(segments, steps)
-    
-    elif steps["extract_method"] == 'optimum':
-        oneD_spec, oneD_err, wav_sols = extract_1D.optimum(segments, steps)
+    # Read the binned light curve x array.
+    xrfile = sorted(glob.glob(os.path.join(outdir,"*lightcurves.nc")))[0]
+    light_curves = xr.open_dataset(xrfile)
 
-    # Align spectra.
-    shifts = []
-    if steps["align"]:
-        oneD_spec, oneD_err, shifts = align_spec.align(oneD_spec, oneD_err,
-                                                       wav_sols, segments.time.values, steps)
-        
-    # Clean spectra.
-    if steps["sigma"]:
-        oneD_spec = clean_spec.clean_spec(oneD_spec, steps)
-
+    # Begin fitting of the light curves.
     # Save everything out.
-    save_s4_output(oneD_spec, oneD_err, segments.time.values, wav_sols, shifts, outfile, outdir)
-
+    save_s5_output()
+    
     # Log.
     if steps["verbose"] >= 1:
-        print("Juniper Stage 4 is complete.")
+        print("Juniper Stage 5 is complete.")

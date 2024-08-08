@@ -44,7 +44,7 @@ def stitch_files(files, time_step, verbose):
             disp_i, cdisp_i, flagged_i = np.zeros_like(time_i), np.zeros_like(time_i), np.zeros_like(time_i)
         elif ".nc" in file:
             # It's Stage 3 output.
-            data_i, err_i, int_count_i, wav_i, dq_i, time_i, disp_i, cdisp_i, flagged_i = read_one_postproc(file)
+            data_i, err_i, int_count_i, wav_i, dq_i, time_i, disp_i, cdisp_i, flagged_i, details_i = read_one_postproc(file)
         # Attributes are appended once.
         int_count.append(int_count_i)
         flagged.append(flagged_i)
@@ -104,10 +104,11 @@ def read_one_datamodel(file):
          t = f.int_times["int_mid_MJD_UTC"]
 
          # And get observation details.
-         obs_instrument = f.header["INSTRUME"]
-         obs_detector = f.header["DETECTOR"]
-         obs_filter = f.header["FILTER"]
-         obs_grating = f.header["GRATING"]
+    with fits.open(file) as f:
+         obs_instrument = f[0].header["INSTRUME"]
+         obs_detector = f[0].header["DETECTOR"]
+         obs_filter = f[0].header["FILTER"]
+         obs_grating = f[0].header["GRATING"]
          obs_details = [obs_instrument,
                         obs_detector,
                         obs_filter,
@@ -133,7 +134,7 @@ def read_one_postproc(file):
     disp = segment.disp.values
     cdisp = segment.cdisp.values
     flagged = segment.flagged
-    details = segment.details
+    details = segment.details.values #[segment.instrument,segment.detector,segment.filter,segment.grating]
     return data, err, int_count, wav, dq, time, disp, cdisp, flagged, details
 
 def save_s3_output(segments, disp_pos, cdisp_pos, moved_ints, outfiles, outdir):
@@ -160,7 +161,8 @@ def save_s3_output(segments, disp_pos, cdisp_pos, moved_ints, outfiles, outdir):
         dq = segments.dq.values[int_left:int_right,:,:]
         time = segments.time.values[int_left:int_right]
         wavelengths = segments.wavelengths.values[int_left:int_right,:,:]
-        details = segments.details[i]
+        #instrument, detector, filter, grating = segments.details[i]
+        seg_details = segments.details[i]
 
         # Plus the new tracking data, if there is any.
         disp = []
@@ -186,11 +188,11 @@ def save_s3_output(segments, disp_pos, cdisp_pos, moved_ints, outfiles, outdir):
                                     ),
                         coords=dict(
                                time = (["time"], time),
+                               details = (["observation_mode"], seg_details),
                                ),
                         attrs=dict(
                               integrations = ints,
                               flagged = moved_int,
-                              details = details,
                               )
         )
 
@@ -226,9 +228,9 @@ def save_s4_output(oneD_spec, oneD_err, time, wav_sols, shifts, details, outfile
                                     ),
                         coords=dict(
                                time = (["time"], time),
+                               details = (["observation_mode"], details),
                                ),
                         attrs=dict(
-                              details = details
                               )
     )
 
@@ -251,9 +253,9 @@ def read_one_spec(file):
     spectrum = spectra.spectrum.values
     err = spectra.err.values
     waves = spectra.waves.values
-    shifts = spectrum.shifts.values
-    time = spectrum.time.values
-    details = spectrum.details
+    shifts = spectra.shifts.values
+    time = spectra.time.values
+    details = spectra.details.values #[spectra.instrument,spectra.detector,spectra.filter,spectra.grating]
     return spectrum, err, waves, shifts, time, details
 
 def stitch_spectra(files, detector_method, time_step, verbose):
@@ -277,9 +279,23 @@ def stitch_spectra(files, detector_method, time_step, verbose):
         for i, f in enumerate(files):
             print(i, f)
 
-    # If there is just one file, we can take it as an xarray right now.
+    # If there is just one file, we can take it as an xarray and adjust it to have the detector dim.
     if len(files) == 1:
-        spectra = xr.open_dataset(files[0])
+        spectrum, err, waves, shifts, time, details = read_one_spec(files[0])
+        spectra = xr.Dataset(data_vars=dict(
+                                    spectrum=(["detector", "time", "wavelength"], [spectrum,]),
+                                    err=(["detector", "time", "wavelength"], [err,]),
+                                    waves=(["detector", "time", "wavelength"],[waves,]),
+                                    shifts=(["detector", "time"],[shifts,]),
+                                    ),
+                        coords=dict(
+                               time = (["detector","time"], [time,]),
+                               detector = (["detector"], [0,]),
+                               details = (["detector","observation_mode"], [details,]), # this has the form [[INSTRUMENT, DETECTOR, FILTER, GRATING]]
+                               ),
+                        attrs=dict(
+                              )
+                              )
 
     else:
         # Initialize some empty lists.
@@ -303,52 +319,83 @@ def stitch_spectra(files, detector_method, time_step, verbose):
         if detector_method == "parallel":
             # We do not join anything. Instead, xarray needs to contain each spectrum separately.
             spectra = xr.Dataset(data_vars=dict(
-                                    spectrum=(["time", "wavelength", "detector"], spectra),
-                                    err=(["time", "wavelength", "detector"], errors),
-                                    waves=(["time", "wavelength", "detector"],waves),
-                                    shifts=(["time", "detector"],shifts),
+                                    spectrum=(["detector", "time", "wavelength"], spectra),
+                                    err=(["detector", "time", "wavelength"], errors),
+                                    waves=(["detector", "time", "wavelength"],waves),
+                                    shifts=(["detector", "time"],shifts),
                                     ),
                         coords=dict(
-                               time = (["time", "detector"], time),
+                               time = (["detector","time"], time),
+                               detectors = (["detector"], [i for i in range(len(files))]),
+                               details = (["detector","observation_mode"], details), # this has the form Ndetectors x [[INSTRUMENT, DETECTOR, FILTER, GRATING]]
                                ),
                         attrs=dict(
-                              details = details
                               )
                               )
         
         elif detector_method == "join":
+            # Check which detectors you are trying to join and warn the user about heinous combos.
+            gratings = [x[-1] for x in details]
+            if any([gratings[0] != grating for grating in gratings]): # if any grating shows up that does not match the first one
+                if verbose >= 1:
+                    print("Warning: I noticed you are trying to stitch together files that use different gratings.")
+                    print("While I commend your bravery, please note that the ''join'' method of combining files")
+                    print("was intended only for single gratings which span multiple detectors (e.g. G395H)")
+                    print("and the correct method for treating multiple gratings is ''parallel''.")
+                    print("If you are not using limb darkening models like ExoTiC-LD, this should not crash the code.")
+                    print("(It will still cause some creative and surprising behavior though.)")
+                    print("If you are using limb darkening models, please relaunch Stage 5 with the ''detectors'' keyword set to ''parallel''.")
             # For every timestamp, we have to concatenate each 1D spectrum together as well as the wavelength solution.
-            con_spec, con_err, con_waves, con_shifts = [], [], [], []
+            con_spec, con_err, con_waves = [], [], []
             time = np.array(time)
             time = np.median(time,axis=0) # should collapse time to roughly the mid-exposure times for all 1D spectra being joined
-            for i in range(time[0].shape):
+            shifts = np.array(shifts)
+            shifts = np.median(shifts,axis=0) # should be the same?
+            for i in range(time.shape[0]):
                 # At every time stamp, grab each spectrum's 1D spec.
                 spec_i = spectra[0][i,:]
                 err_i = errors[0][i,:]
                 waves_i = waves[0][i,:]
-                shifts_i = shifts[0][i,:]
                 for j in range(1,len(spectra)):
-                    spec_i = np.concatenate(spec_i,spectra[j][i,:])
-                    err_i = np.concatenate(err_i,errors[j][i,:])
-                    waves_i = np.concatenate(waves_i,waves[j][i,:])
-                    shifts_i = np.concatenate(shifts_i,shifts[j][i,:])
+                    spec_i = np.concatenate((spec_i,spectra[j][i,:]))
+                    err_i = np.concatenate((err_i,errors[j][i,:]))
+                    waves_i = np.concatenate((waves_i,waves[j][i,:]))
                 con_spec.append(spec_i)
                 con_err.append(err_i)
                 con_waves.append(waves_i)
-                con_shifts.append(shifts_i)
             
             spectra = xr.Dataset(data_vars=dict(
-                                    spectrum=(["time", "wavelength"], con_spec),
-                                    err=(["time", "wavelength"], con_err),
-                                    waves=(["time", "wavelength"],con_waves),
-                                    shifts=(["time"],shifts),
+                                    spectrum=(["detector", "time", "wavelength"], [con_spec,]),
+                                    err=(["detector", "time", "wavelength"], [con_err,]),
+                                    waves=(["detector", "time", "wavelength"],[con_waves,]),
+                                    shifts=(["detector", "time"],[shifts,]),
                                     ),
                         coords=dict(
-                               time = (["time"], time),
+                               time = (["detector", "time"], [time,]),
+                               detectors = (["detector",], [0,]), # there is now just one "detector" which is the joined dataset
+                               details = (["detector","observation_mode"], [details[0],]), # this has the form [[INSTRUMENT, DETECTOR, FILTER, GRATING]]
                                ),
                         attrs=dict(
-                              details = details
                               )
                               )
 
     return spectra
+
+def read_one_lc(file):
+    """Read one light curve .nc file and return its attributes.
+
+    Args:
+        file (str): path to the .nc file you want to read out.
+
+    Returns:
+        np.array, np.array, np.array, np.array, np.array, list: the spectrum,
+        uncertainties, wavelength solutions, alignment shifts, times of
+        mid-exposure for each spectrum, and the observing details which are
+        instrument, detector, filter, and grating.
+    """
+    curves = xr.open_dataset(file)
+    
+    return curves#spectrum, err, waves, shifts, time, details
+
+def save_s5_output():
+    return 'wry'

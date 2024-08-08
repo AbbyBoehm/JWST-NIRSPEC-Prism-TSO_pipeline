@@ -46,19 +46,6 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
                             time_step=time_step,
                             verbose=steps["verbose"])
     
-    # Kick unwanted integrations.
-    bad_frames = []
-    if steps["s3_kick_ints"]:
-        bad_frames = segments.flagged
-    if steps["trim_ints"]:
-        for trim_ints in steps["trim_ints"]:
-            for i in [j for j in trim_ints if j not in bad_frames]:
-                bad_frames.append(i)
-    # Now that all bad frames are found, kick them.
-    segments.data.values = np.delete(segments.data.values, bad_frames)
-    if steps["verbose"] >= 1:
-        print("{} integrations deleted from segments.".format(len(bad_frames)))
-
     # Extract 1D spectra.
     if steps["extract_method"] == 'box':
         oneD_spec, oneD_err, wav_sols = extract_1D.box(segments, steps)
@@ -66,18 +53,37 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
     elif steps["extract_method"] == 'optimum':
         oneD_spec, oneD_err, wav_sols = extract_1D.optimum(segments, steps)
 
+    # Kick unwanted integrations.
+    if steps["verbose"] >= 1:
+        print("Kicking flagged frames from 1D spectra...")
+    bad_frames = []
+    if steps["s3_kick_ints"]:
+        bad_frames = [j for j in segments.flagged[0]]
+    if steps["trim_ints"]:
+        for trim_ints in steps["trim_ints"]:
+            for i in [j for j in trim_ints if j not in bad_frames]:
+                bad_frames.append(i)
+    # Now that all bad frames are found, kick them.
+    oneD_spec = np.delete(oneD_spec, bad_frames, axis=0)
+    oneD_err = np.delete(oneD_err, bad_frames, axis=0)
+    wav_sols = np.delete(wav_sols, bad_frames, axis=0)
+    time = np.delete(segments.time.values, bad_frames, axis=0)
+    if steps["verbose"] >= 1:
+        print("{} integrations deleted from spectra.".format(len(bad_frames)))
+
+
     # Align spectra.
     shifts = []
     if steps["align"]:
         oneD_spec, oneD_err, shifts = align_spec.align(oneD_spec, oneD_err,
-                                                       wav_sols, segments.time.values, steps)
+                                                       wav_sols, time, steps)
         
     # Clean spectra.
     if steps["sigma"]:
         oneD_spec = clean_spec.clean_spec(oneD_spec, steps)
 
     # Save everything out.
-    save_s4_output(oneD_spec, oneD_err, segments.time.values, wav_sols, shifts, segments.details, outfile, outdir)
+    save_s4_output(oneD_spec, oneD_err, time, wav_sols, shifts, segments.details[0], outfile, outdir)
 
     # Log.
     if steps["verbose"] >= 1:
