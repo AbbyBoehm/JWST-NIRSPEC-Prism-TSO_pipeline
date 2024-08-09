@@ -31,9 +31,10 @@ n_columns       10                                          # int. How many colu
 # Step 3: Light-curve fitting
 fit_broadband   True                                        # bool. Whether you will be fitting broad-band light curves.
 fit_spec        True                                        # bool. Whether you will be fitting spectroscopic light curves. For these curves, system parameters are forced fixed, regardless of whether you fit the broad-band curves or not.
+scale_errors    True                                        # bool. Whether to fit a multiplier to the errors extracted in Stage 4 to achieve a reduced-chi2 of unity. WIP!
 
 use_LSQ         True                                        # bool. Whether to use a linear least-squares estimator to refine initial parameter guesses and scale error bars to achieve unity chi2.
-LSQ_type        ''                                          # str. Scipy.optimize.minimize algorithm to use.
+LSQ_type        ''                                          # str. Scipy.optimize.minimize algorithm to use. Options are "Nelder-Mead", "L-BFGS-B", "Powell", or "TNC", as only these methods support bounds.
 LSQ_tolerance   1e-10                                       # float. Tolerance for scipy LSQ algorithm. The smaller the number, the more tightly it will try to fight.
 LSQ_iter        None                                        # int. If not None, forces LSQ to stop after this many iterations.
 
@@ -104,11 +105,15 @@ n_flare         0                                           # int. How many flar
 
 # Step 3e: Setting up your systematics
 poly            True                                        # bool. Whether to fit a visit-long polynomial trend to the data.
-poly_order      1                                           # float. The order of polynomial to fit.
-mirrortilt      False                                       # bool. Whether to fit for a mirror tilt event, which manifests as a sudden step in flux levels between tw 
+poly_order      1                                           # float. The order of polynomial to fit. You should at least fit a 0th-order polynomial, which scales the entire curve by a constant.
+
+mirrortilt      False                                       # bool. Whether to fit for the specified number of mirror tilt events, which manifest as sudden steps in flux level before and after the tilt.
 n_tilt_events   0                                           # float. The number of tilt events to fit for.
+
 pos_detrend     True                                        # bool. Whether to detrend based on the dispersion position and cross-dispersion position+width measured in Stage 3.
+
 superbias_scale True                                        # bool. Whether to do superbias scaling. WIP!
+
 singleramp      True                                        # bool. Whether to fit a single exponential ramp.
 doubleramp      True                                        # bool. Whether to fit a double exponential ramp.
 

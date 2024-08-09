@@ -7,9 +7,9 @@ from scipy.optimize import minimize
 from juniper.stage5 import batman_handler
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 
-def lsq_one(time, light_curve, pos,
-            planets, flares, systematics,
-            inpt_dict):
+
+
+def lsq_one(time, light_curve, pos, planets, flares, systematics, inpt_dict):
     """Performs linear least squares fitting on the given array(s) using scipy.
     More than one light curve may be fit at a time (i.e. fitting two simultaneous
     transits observed on different detectors).

@@ -126,7 +126,7 @@ def systematic_doubleramp(t, coeffs):
         np.array: double ramp model to be added to Sys(t;A).
     """
     double_ramp = (1 + coeffs[0]*np.exp(coeffs[1]*t + coeffs[2])
-                     + coeffs[3]*np.exp(coeffs[4]*t + coeffs[5]))
+                     + coeffs[3]*np.exp(-coeffs[4]*t + coeffs[5]))
     return double_ramp
 
 def systematic_mirrortilt(t, coeffs):

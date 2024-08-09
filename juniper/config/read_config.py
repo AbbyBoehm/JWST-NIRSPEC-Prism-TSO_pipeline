@@ -17,6 +17,7 @@ def read_config(path_to_config_file):
     # Define certain keys as special.
     special_keys = ["rp","fp","t_prim","t_seco","period",
                     "aor","incl","ecc","longitude"]
+    # FIX: i need to add special keys for the flares too!
     prior_keys = [key+"_prior" for key in special_keys]
     for key in prior_keys:
         special_keys.append(key)
