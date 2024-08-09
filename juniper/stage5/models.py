@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.special import erfc
 
 from juniper.stage5 import batman_handler
 
@@ -159,3 +160,38 @@ def systematic_jitter(xpos, ypos, widths, coeffs):
     """
     jitter = 1 + coeffs[0]*xpos + coeffs[1]*ypos + coeffs[2]*widths
     return jitter
+
+def flare_model(t, flare):
+    """Model of a flare from Tovar Mendoza+ 2022
+
+    Args:
+        t (np.array): time.
+        flare (dict): description of this flare, including its start time,
+        amplitude, and fade time.
+
+    Returns:
+        np.array: flux of a flare with time.
+    """
+    t_offset = np.array([ti - flare["E"] for ti in t])
+    c1 = np.sqrt(np.pi)*flare["A"]*flare["C"]/2
+    c2 = flare["F1"]*flare_h(t_offset, flare["B"], flare["C"], flare["D1"])
+    c3 = (1-flare["F1"])*flare_h(t_offset, flare["B"], flare["C"], flare["D2"])
+    return c1*(c2+c3)
+
+def flare_h(t, B, C, D):
+    """The exponetial h terms from Tovar Mendoza+ 2022's flare model.
+
+    Args:
+        t (np.array): time.
+        B (float): parameter of the h term.
+        C (float): parameter of the h term.
+        D (float): parameter of the h term.
+
+    Returns:
+        np.array: an h term in the flare.
+    """
+    a1 = -D*t
+    a2 = D*C/2
+    a3 = ((B/C)+a2)**2
+    a4 = (B-t)/C
+    return np.exp(a1+a3)*erfc(a4+a2)
