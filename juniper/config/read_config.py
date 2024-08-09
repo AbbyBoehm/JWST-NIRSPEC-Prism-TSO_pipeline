@@ -14,6 +14,16 @@ def read_config(path_to_config_file):
     # Open the dictionary.
     config = {}
 
+    # Define certain keys as special.
+    special_keys = ["rp","fp","t_prim","t_seco","period",
+                    "aor","incl","ecc","longitude"]
+    prior_keys = [key+"_prior" for key in special_keys]
+    for key in prior_keys:
+        special_keys.append(key)
+    seen_this_key = {}
+    for key in special_keys:
+        seen_this_key[key] = 0
+
     # Read out all lines.
     with open(path_to_config_file,mode='r') as f:
         lines = f.readlines()
@@ -27,6 +37,15 @@ def read_config(path_to_config_file):
         if line[0] == '#':
             continue
         key = line[0]
+
+        # Handle special keys.
+        if key in special_keys:
+            # For planets and flares, the same key name may appear many times. 
+            # e.g. if you fit two planets in transit, rp and rp_prior will both appear twice.
+            # So we have to add numbers to keep them distinct.
+            seen_this_key[key] += 1 # keep track of how many times we've seen the special key.
+            key = key + str(seen_this_key[key])
+
         # Param may have spaces, so we need to keep going with it.
         param = line[1]
         i = 2
@@ -37,6 +56,8 @@ def read_config(path_to_config_file):
             param = eval(param)
         except:
             pass
+        # If we are reading planet or flare parameters, there are special rules! They have duplicates!
+        
         config[key] = param
 
     return config

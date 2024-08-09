@@ -7,7 +7,7 @@ import xarray as xr
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate
 from juniper.util.datahandling import stitch_spectra, save_s5_output
-from juniper.stage5 import bin_light_curves
+from juniper.stage5 import bin_light_curves, LSQfit, MCMCfit
 
 def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
     """Performs Stage 5 fitting on the given files.
@@ -59,6 +59,12 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
     light_curves = xr.open_dataset(xrfile)
 
     # Begin fitting of the light curves.
+    if steps["fit_broadband"]:
+        # Fit whatever broad-band light curves are supplied. If more than one is supplied,
+        # (i.e. if len(light_curves.detectors.values) > 1), we will fit in parallel.
+        if steps["use_LSQ"]:
+            output = LSQfit()
+    
     # Save everything out.
     save_s5_output()
     

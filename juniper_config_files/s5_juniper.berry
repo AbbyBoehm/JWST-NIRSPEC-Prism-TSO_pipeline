@@ -29,8 +29,11 @@ wave_bins       np.arange(0.50,6.125,0.125)                 # Either an object t
 n_columns       10                                          # int. How many columns each bin should contain.
 
 # Step 3: Light-curve fitting
+fit_broadband   True                                        # bool. Whether you will be fitting broad-band light curves.
+fit_spec        True                                        # bool. Whether you will be fitting spectroscopic light curves. For these curves, system parameters are forced fixed, regardless of whether you fit the broad-band curves or not.
+
 use_LSQ         True                                        # bool. Whether to use a linear least-squares estimator to refine initial parameter guesses and scale error bars to achieve unity chi2.
-LSQ_type        ''                                          # str. Scipy.optimize least-square algorithm to use.
+LSQ_type        ''                                          # str. Scipy.optimize.minimize algorithm to use.
 LSQ_tolerance   1e-10                                       # float. Tolerance for scipy LSQ algorithm. The smaller the number, the more tightly it will try to fight.
 LSQ_iter        None                                        # int. If not None, forces LSQ to stop after this many iterations.
 
@@ -38,6 +41,8 @@ use_MCMC        True                                        # bool. Whether to u
 MCMC_chains     20                                          # int. How many chains to run in parallel.
 MCMC_steps      20000                                       # int. How many steps each chain should take before running.
 MCMC_burnin     0.20                                        # int > 1 or float < 1. If int, how many steps are regarded as burn-in, independent of MCMC_steps. If float, the fraction of MCMC_steps to be considered burn-in.
+
+priors_type     'uniform'                                   # Str. Options are 'uniform' or 'gaussian'. See priors below for more info. Set this whether you use LSQ, MCMC, or both!
 
 # Step 3a: Setting up your star
 star_MH         0.00                                        # float. Metallicity of the star in dex.
@@ -63,16 +68,33 @@ instrument_mode "JWST_NIRSpec_Prism"                        # str. Specifies whi
 event_type      'transit'                                   # str. Options are 'transit'/'primary' or 'eclipse'/'secondary'.
 n_planets       1                                           # int. How many planets to fit. Most observations have just one, but some have more than one!
 
-# Step 3c i: Planet parameters - make one copy of this entry per planet!
+# Step 3c i: Planet parameters - make one copy of this entry per planet! Set prior = None to fix that parameter instead of fitting for it.
 rp              0.10                                        # float. Planet radius in terms of stellar radius, rp/r*.
+rp_prior        [0,100]                                     # list of float. If priors are 'uniform', these are the min and max allowed value. If 'gaussian', this is the mean and sigma of the Gaussian prior.
+
 fp              0.0001                                      # float. Planet flux in terms of stellar flux, fp/f*.
-t_primary       0                                           # float. Mid-transit time in days.
-t_secondary     0                                           # float. Mid-eclipse time in days.
+fp_prior        None                                        # list of float. If priors are 'uniform', these are the min and max allowed value. If 'gaussian', this is the mean and sigma of the Gaussian prior.
+
+t_prim          0                                           # float. Mid-transit time in days.
+t_prim_prior    [-1,1]                                      # list of float. If priors are 'uniform', these are the min and max allowed value. If 'gaussian', this is the mean and sigma of the Gaussian prior.
+
+t_seco          0                                           # float. Mid-eclipse time in days.
+t_seco_prior    None                                        # list of float. If priors are 'uniform', these are the min and max allowed value. If 'gaussian', this is the mean and sigma of the Gaussian prior.
+
 period          3                                           # float. Orbital period in days.
+period_prior    None                                        # list of float. If priors are 'uniform', these are the min and max allowed value. If 'gaussian', this is the mean and sigma of the Gaussian prior.
+
 aor             10                                          # float. Orbital semimajor axis in terms of stellar radius, a/r*.
-inclination     90                                          # float. Orbital inclination in degrees.
-eccentricity    0                                           # float. Orbital eccentricity, usually assumed to be 0 for short-period planets.
-longitude_peri  0                                           # float. Orbital longitude of periastron in degrees.
+aor_prior       None                                        # list of float. If priors are 'uniform', these are the min and max allowed value. If 'gaussian', this is the mean and sigma of the Gaussian prior.
+
+incl            90                                          # float. Orbital inclination in degrees.
+incl_prior      None                                        # list of float. If priors are 'uniform', these are the min and max allowed value. If 'gaussian', this is the mean and sigma of the Gaussian prior.
+
+ecc             0                                           # float. Orbital eccentricity, usually assumed to be 0 for short-period planets.
+ecc_prior       None                                        # list of float. If priors are 'uniform', these are the min and max allowed value. If 'gaussian', this is the mean and sigma of the Gaussian prior.
+
+longitude       0                                           # float. Orbital longitude of periastron in degrees.
+longitude_prior None                                        # list of float. If priors are 'uniform', these are the min and max allowed value. If 'gaussian', this is the mean and sigma of the Gaussian prior.
 
 # Step 3d: Setting up your flares
 n_flare         0                                           # int. How many flares to fit. Most observations do not contain a flare, but if you see any, use this to specify how many the fitter should look for.
@@ -82,8 +104,12 @@ n_flare         0                                           # int. How many flar
 
 # Step 3e: Setting up your systematics
 poly            True                                        # bool. Whether to fit a visit-long polynomial trend to the data.
-order           1                                           # float. The order of polynomial to fit.
-ydetrend        True                                        # bool. Whether to ydetrend. WIP!
+poly_order      1                                           # float. The order of polynomial to fit.
+mirrortilt      False                                       # bool. Whether to fit for a mirror tilt event, which manifests as a sudden step in flux levels between tw 
+n_tilt_events   0                                           # float. The number of tilt events to fit for.
+pos_detrend     True                                        # bool. Whether to detrend based on the dispersion position and cross-dispersion position+width measured in Stage 3.
 superbias_scale True                                        # bool. Whether to do superbias scaling. WIP!
+singleramp      True                                        # bool. Whether to fit a single exponential ramp.
+doubleramp      True                                        # bool. Whether to fit a double exponential ramp.
 
 # ENDPARSE

@@ -165,9 +165,9 @@ def bin_light_curves(spectra, inpt_dict):
                 l = r
                 r += n_columns
             # Add the final bin.
-            bin_spec = np.ma.sum(spectrum[:,l:-1],axis=1)
-            bin_err = np.ma.sqrt(np.ma.sum(np.square(error[:,l:-1]),axis=1))
-            bin_wave = np.ma.median(waves[l:-1])
+            bin_spec = np.ma.sum(spectrum[:,l:],axis=1)
+            bin_err = np.ma.sqrt(np.ma.sum(np.square(error[:,l:]),axis=1))
+            bin_wave = np.ma.median(waves[l:])
     
             # Store both the spectrum and each point's uncertainty.
             spec_det.append(bin_spec)
