@@ -16,8 +16,8 @@ def read_config(path_to_config_file):
 
     # Define certain keys as special.
     special_keys = ["rp","fp","t_prim","t_seco","period",
-                    "aor","incl","ecc","longitude"]
-    # FIX: i need to add special keys for the flares too!
+                    "aor","incl","ecc","longitude",
+                    "A","B","C","Dr","Ds","Fr","E"]
     prior_keys = [key+"_prior" for key in special_keys]
     for key in prior_keys:
         special_keys.append(key)
@@ -43,6 +43,7 @@ def read_config(path_to_config_file):
         if key in special_keys:
             # For planets and flares, the same key name may appear many times. 
             # e.g. if you fit two planets in transit, rp and rp_prior will both appear twice.
+            # And if you fit two flares, they will have two distinct amplitudes A.
             # So we have to add numbers to keep them distinct.
             seen_this_key[key] += 1 # keep track of how many times we've seen the special key.
             key = key + str(seen_this_key[key])
@@ -57,7 +58,6 @@ def read_config(path_to_config_file):
             param = eval(param)
         except:
             pass
-        # If we are reading planet or flare parameters, there are special rules! They have duplicates!
         
         config[key] = param
 

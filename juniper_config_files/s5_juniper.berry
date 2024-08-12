@@ -1,4 +1,4 @@
-# Juniper config file for launching Stage 5: Fitting
+# Juniper config file for launching Stage 5: Binning and Fitting
 
 # Setup for Stage 5
 toplevel_dir    ''                                          # Top-level directory for all files in this project. The input and output files should be here.
@@ -66,7 +66,7 @@ interpolate     "trilinear"                                 # str. How to interp
 instrument_mode "JWST_NIRSpec_Prism"                        # str. Specifies which instrument was used for the observations.
 
 # Step 3c: Setting up your planets
-event_type      'transit'                                   # str. Options are 'transit'/'primary' or 'eclipse'/'secondary'.
+event_type      'primary'                                   # str. Options are 'primary' (for transits) or 'secondary' (for eclipses).
 n_planets       1                                           # int. How many planets to fit. Most observations have just one, but some have more than one!
 
 # Step 3c i: Planet parameters - make one copy of this entry per planet! Set prior = None to fix that parameter instead of fitting for it.
@@ -98,16 +98,29 @@ longitude       0                                           # float. Orbital lon
 longitude_prior None                                        # list of float. If priors are 'uniform', these are the min and max allowed value. If 'gaussian', this is the mean and sigma of the Gaussian prior.
 
 # Step 3d: Setting up your flares
-n_flare         0                                           # int. How many flares to fit. Most observations do not contain a flare, but if you see any, use this to specify how many the fitter should look for.
+n_flares        0                                           # int. How many flares to fit. Most observations do not contain a flare, but if you see any, use this to specify how many the fitter should look for.
 
 # Step 3d i: Flare parameters - make one copy of this entry per flare!
 A               1                                           # float. Amplitude of the flare.
+A_prior         [-1e10,1e10]                                # list of float. Same rules as planet parameter priors.
+
 B               0                                           # float. Position in time of the flare peak relative to where the flare model began.
+B_prior         [-1e10,1e10]                                # list of float. Same rules as planet parameter priors.
+
 C               1                                           # float. Gaussian heating timescale.
-D1              1                                           # float. Timescale of the rapid cooling phase.
-D2              1                                           # float. Timescale of the slow cooling phase.
-F1              0.5                                         # float. Relative importance of the rapid cooling exponential. The importance of the slow cooler is F2 = 1 - F1.
+C_prior         [-1e10,1e10]                                # list of float. Same rules as planet parameter priors.
+
+Dr              1                                           # float. Timescale of the rapid cooling phase.
+Dr_prior        [-1e10,1e10]                                # list of float. Same rules as planet parameter priors.
+
+Ds              1                                           # float. Timescale of the slow cooling phase.
+Ds_prior        [-1e10,1e10]                                # list of float. Same rules as planet parameter priors.
+
+Fr              0.5                                         # float. Relative importance of the rapid cooling exponential. The importance of the slow cooler is Fs = 1 - Fr.
+Fr_prior        [0,1]                                       # list of float. Same rules as planet parameter priors.
+
 E               None                                        # float. Offset in time. If None, initializes as the MJD of the first integration.
+E_prior         [-1e10,1e10]                                # list of float. Same rules as planet parameter priors.
 
 # Step 3e: Setting up your systematics
 poly            True                                        # bool. Whether to fit a visit-long polynomial trend to the data.

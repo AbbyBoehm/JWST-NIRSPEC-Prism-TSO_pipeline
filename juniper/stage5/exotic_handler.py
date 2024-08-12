@@ -6,18 +6,14 @@ def get_exotic_coefficients(model_type, stellar_params, exoticLD_instructions):
     """Get limb darkening coefficients from ExoTiC-LD.
 
     Args:
-        model_type (str): options are "linear", "quadratic", "square-root", and "nonlinear".
-        stellar_params (dict): the stellar metallicity MH, effective temperature
-        Teff, and surface gravity logg.
-        exoticLD_instructions (dict): instructions for ExoTiC-LD, including the
-        wavelength range you want to compute LDs over, the observing mode, the
-        model grid to use (and path to custom model if grid is None), and the
-        interpolation method.
+        exoticLD_instructions (dict): instructions for limb darkening handling.
 
     Returns:
         list: list of floats corresponding to calculated LD coefficients.
     """
     # Unpack instructions.
+    model_type = exoticLD_instructions["LD_model"]
+    stellar_params = exoticLD_instructions["stellar_params"]
     wavelength_range = exoticLD_instructions["wavelength_range"]
     instrument_mode = exoticLD_instructions["instrument_mode"]
     ld_data_path = exoticLD_instructions["ld_data_path"]
@@ -37,7 +33,7 @@ def get_exotic_coefficients(model_type, stellar_params, exoticLD_instructions):
     # Otherwise, generate SLD from the stellar params.
     else:
         sld = SLD(M_H=stellar_params["MH"], Teff=stellar_params["Teff"], logg=stellar_params["logg"],
-                ld_model=ld_grid, ld_data_path=ld_data_path, interpolate_type=interpolate, verbose=True)
+                  ld_model=ld_grid, ld_data_path=ld_data_path, interpolate_type=interpolate, verbose=True)
     
     # Now use SLD to make coefficients for the requested model type.
     if model_type == "linear":

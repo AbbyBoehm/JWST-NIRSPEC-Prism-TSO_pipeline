@@ -3,7 +3,7 @@ from scipy.special import erfc
 
 from juniper.stage5 import batman_handler
 
-def full_model(t, planets, flares, systematics):
+def full_model(t, planets, flares, systematics, params_to_fit=None, fit_param_keys=None):
     """Builds a model of a transit/eclipse light curve using the provided
     information on observed planets, suspected flaring events, and systematic
     models to detrend for.
@@ -17,23 +17,29 @@ def full_model(t, planets, flares, systematics):
         event suspected to have occurred during the observation.
         systematics (dict): a series of dictionary entries describing each
         systematic model to detrend for.
+        params_to_fit (dict, optional): new planet parameters, needs to be
+        supplied if you are fitting. Defaults to None.
+        fit_param_keys (list of str, optional): the parameters that are actually
+        being updated during fitting. Guides the whole process. Defaults to None.
     
     Returns:
         np.array, dict: Sys(t;A)*(Sum[planets(t;B)+flares(t;C)]), or the sum of
         planet and flare events multiplied by systematic detrending. Every component
         of the model is also output individually as a dictionary.
     """
-    # Initialize flux against time as 1s.
-    flx = np.ones_like(t)
+    # Initialize planett flux against time as 0s.
+    flx = np.zeros_like(t)
     # Track individual models as well.
     models = {}
 
     # Build planetary flux.
     for planet_name in list(planets.keys()):
         planet = planets[planet_name] # dict, contains rp, rp_prior, fp, fp_prior, etc. as well as batman_model
-        batman_flux = batman_handler.batman_flux_update(params_to_fit=None,
-                                                        batman_params=planet["batman_params"],
-                                                        batman_model=planet["batman_model"])
+        planet_ID = str.replace(planet_name, "planet", "")
+        batman_flux = batman_handler.batman_flux_update(params_to_fit=params_to_fit,
+                                                        fit_param_keys=fit_param_keys,
+                                                        batman_params=[planet["batman_params"+planet_ID],],
+                                                        batman_model=[planet["batman_model"+planet_ID],])
         # Add planet's flux contribution into the full model.
         flx += batman_flux
         models[planet_name] = batman_flux
@@ -41,8 +47,7 @@ def full_model(t, planets, flares, systematics):
     # Build flare flux.
     for flare_ID in list(flares.keys()):
         flare = flares[flare_ID] # dict, contains flare parameters
-        flare_flux = np.zeros_like(t)
-        # WIP!
+        flare_flux = flare_model(t, flare)
         # Add flare's flux contribution into the full model.
         flx += flare_flux
         models[flare_ID] = flare_flux
@@ -95,12 +100,12 @@ def systematic_polynomial(t, coeffs):
         np.array: polynomial model to be added to Sys(t;A).
     """
     # Set up empty polynomial.
-    poly = np.array([0 for i in t])
+    poly = np.array([0 for i in t], dtype='float64')
 
     # And populate.
     for n, o in enumerate(coeffs):
-        poly += o*(t**n)
-
+        poly += np.array(o*(t**n), dtype='float64')
+    
     return poly
 
 def systematic_expramp(t, coeffs):
@@ -174,8 +179,8 @@ def flare_model(t, flare):
     """
     t_offset = np.array([ti - flare["E"] for ti in t])
     c1 = np.sqrt(np.pi)*flare["A"]*flare["C"]/2
-    c2 = flare["F1"]*flare_h(t_offset, flare["B"], flare["C"], flare["D1"])
-    c3 = (1-flare["F1"])*flare_h(t_offset, flare["B"], flare["C"], flare["D2"])
+    c2 = flare["Fr"]*flare_h(t_offset, flare["B"], flare["C"], flare["Dr"])
+    c3 = (1-flare["Fr"])*flare_h(t_offset, flare["B"], flare["C"], flare["Ds"])
     return c1*(c2+c3)
 
 def flare_h(t, B, C, D):
