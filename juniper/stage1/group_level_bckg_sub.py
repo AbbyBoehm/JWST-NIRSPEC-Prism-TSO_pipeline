@@ -1,3 +1,4 @@
+import os
 from tqdm import tqdm
 
 import numpy as np
@@ -7,13 +8,14 @@ from juniper.util.diagnostics import tqdm_translate, plot_translate
 from juniper.util.cleaning import median_spatial_filter, colbycol_bckg, get_trace_mask
 from juniper.util.plotting import img
 
-def glbs(datamodel, inpt_dict):
+def glbs(datamodel, inpt_dict, plot_dir):
     """Performs group-level background subtraction on every group in the datamodel according to the instructions in inpt_dict.
     Adapted from routine developed by Trevor Foote (tof2@cornell.edu).
 
     Args:
         datamodel (jwst.datamodel): A datamodel containing attribute .data, which is an np array of shape nints x ngroups x nrows x ncols, produced during wrap_front_end.
         inpt_dict (dict): A dictionary containing instructions for performing this step.
+        plot_dir (str): location to save diagnostic plots to.
 
     Returns:
         jwst.datamodel: datamodel with updated cleaned .data attribute.
@@ -26,7 +28,7 @@ def glbs(datamodel, inpt_dict):
     time_step, time_ints = tqdm_translate(inpt_dict["verbose"])
     # FIX : i'll figure this out later
     plot_step, plot_ints = plot_translate(inpt_dict["show_plots"])
-    save_step, save_plots = plot_translate(inpt_dict["save_plots"])
+    save_step, save_ints = plot_translate(inpt_dict["save_plots"])
 
     # Copy data.
     data = np.copy(datamodel.data)
@@ -40,7 +42,29 @@ def glbs(datamodel, inpt_dict):
         if inpt_dict["mask"]:
             trace_mask = get_trace_mask(median_spatial_filter(np.copy(data[i,-1,:,:]),
                                                               sigma=inpt_dict["sigma"],
-                                                              kernel=inpt_dict["kernel"]))
+                                                              kernel=inpt_dict["kernel"]),
+                                        threshold=inpt_dict["threshold"])
+        
+            if (plot_step or save_step) and i == 0:
+                # Save a diagnostic plot of the first trace mask.
+                fig, ax, im = img(trace_mask, aspect=20, title="1/f trace mask",
+                                  vmin=0, vmax=1, norm='linear',verbose=inpt_dict["verbose"])
+                if save_step:
+                    plt.savefig(os.path.join(plot_dir,"glbs_trace_mask_{}.png".format(i)),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show()
+                plt.close()
+            if (plot_ints or save_ints):
+                # Save a diagnostic plot of every trace mask.
+                fig, ax, im = img(trace_mask, aspect=20, title="1/f trace mask",
+                                  vmin=0, vmax=1, norm='linear',verbose=inpt_dict["verbose"])
+                if save_step:
+                    plt.savefig(os.path.join(plot_dir,"glbs_trace_mask_{}.png".format(i)),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show()
+                plt.close()
             
         for g in tqdm(range(data.shape[1]),
                       desc = "Correcing integration {}...".format(i),
@@ -49,6 +73,27 @@ def glbs(datamodel, inpt_dict):
             datamodel.data[i,g,:,:], background = colbycol_bckg(data[i,g,:,:],
                                                                 inpt_dict["rows"],
                                                                 trace_mask)
+            
+            if (plot_step or save_step) and g == 0 and i == 0:
+                # Plot and/or save the background of the first int's first group as an example.
+                fig, ax, im = img(background, aspect=20, title="Group {}, int {} background".format(g, i),
+                                  norm='linear',verbose=inpt_dict["verbose"])
+                if save_step:
+                    plt.savefig(os.path.join(plot_dir,"glbs_bckg_g{}_i{}.png".format(g,i)),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show()
+                plt.close()
+            if (plot_ints or save_ints):
+                # Plot and/or save every background to be thorough.
+                fig, ax, im = img(background, aspect=20, title="Group {}, int {} background".format(g, i),
+                                  norm='linear',verbose=inpt_dict["verbose"])
+                if save_ints:
+                    plt.savefig(os.path.join(plot_dir,"glbs_bckg_g{}_i{}.png".format(g,i)),
+                                dpi=300, bbox_inches='tight')
+                if plot_ints:
+                    plt.show()
+                plt.close()
     
     # Log.
     if inpt_dict["verbose"] >= 1:

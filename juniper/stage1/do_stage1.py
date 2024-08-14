@@ -5,7 +5,7 @@ from juniper.util.diagnostics import tqdm_translate, plot_translate
 from juniper.config.translate_config import s1_to_pipeline, s1_to_glbs, s1_to_NSClean
 from juniper.stage1 import group_level_bckg_sub, wrap_stage1jwst, NSClean
 
-def do_stage1(filepaths, outfiles, outdir, steps):
+def do_stage1(filepaths, outfiles, outdir, steps, plot_dir):
     """Performs Stage 1 calibration on the given files.
 
     Args:
@@ -13,6 +13,7 @@ def do_stage1(filepaths, outfiles, outdir, steps):
         outfiles (list): lst of str. Names to give to the calibrated files.
         outdir (str): location of where to save the calibrated files to.
         steps (dict): instructions on how to run this stage of the pipeline. Loaded from the Stage 1 .berry files.
+        plot_dir (str): location to save diagnostic plots to.
     """
     # Log.
     if steps["verbose"] >= 1:
@@ -45,7 +46,7 @@ def do_stage1(filepaths, outfiles, outdir, steps):
         # Perform group-level background subtraction.
         if steps["do_glbs"]:
             s1_glbs = s1_to_glbs(steps)
-            datamodel = group_level_bckg_sub.glbs(datamodel, s1_glbs)
+            datamodel = group_level_bckg_sub.glbs(datamodel, s1_glbs, plot_dir)
 
         # Wrap the last steps of Detector1Pipeline.
         result = wrap_stage1jwst.wrap_back_end(datamodel, s1_pipeline, outfile, outdir)
@@ -53,7 +54,7 @@ def do_stage1(filepaths, outfiles, outdir, steps):
         # Perform NSClean background subtraction.
         if steps["do_NSClean"]:
             s1_NSClean = s1_to_NSClean(steps)
-            NSClean.NSClean(filepath, s1_NSClean)
+            NSClean.NSClean(filepath, s1_NSClean, plot_dir)
         
         if steps["verbose"] == 2:
             print("One iteration complete. Output saved in", outdir, "as file name {}.fits".format(outfile))

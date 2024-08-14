@@ -49,7 +49,6 @@ def colbycol_bckg(data, bckg_rows=[], trace_mask=None):
             
     # Define the median background in each column and extend to a full-size array.
     background = np.ma.median(background_region, axis=0)
-    #background = np.where(False, 0, background) # FIX: is this a good fix for catching all-masked cols?
     background = np.array([background,]*data.shape[0])
 
     # And remove background from data.
@@ -61,7 +60,8 @@ def get_trace_mask(data, threshold=10000):
 
     Args:
         data (np.array): 2D array of data.
-        threshold (float, optional): counts level at which to declare something as definitely part of the trace. Defaults to 10000.
+        threshold (float, optional): counts level at which to declare something
+        as definitely part of the trace. Defaults to 10000.
     
     Returns:
         np.ma.mask: np mask hiding trace pixels.
@@ -70,6 +70,7 @@ def get_trace_mask(data, threshold=10000):
     mu = np.median(data[data<threshold])
     sig = np.std(data[data<threshold])
 
-    # If the data exceeds the mean background level by a fairly significant amount, it is definitely trace and must be masked.
-    masked_fg = np.ma.masked_where(np.abs(data - mu) > 2*sig, data)
+    # If the data /positively/ exceeds the mean background level by a 95%
+    # significant amount, it is definitely trace and must be masked.
+    masked_fg = np.ma.masked_where(data - mu > 2*sig, data)
     return np.ma.getmask(masked_fg)

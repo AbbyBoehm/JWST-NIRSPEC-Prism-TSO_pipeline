@@ -1,4 +1,3 @@
-# This is going to be the big wrapper for all stages.
 import os
 import glob
 import shutil
@@ -37,7 +36,7 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             # Add an extra sub-folder to separate this run from other runs.
             output_dir = os.path.join(project_dir,os.path.join(s1_config["output"],run_name))
-        diagnosticplots_dir = os.path.join(project_dir, s1_config["diagnostics"]) # FIX: currently unused
+        diagnosticplots_dir = os.path.join(output_dir, s1_config["diagnostics"])
 
         # Find files.
         files = sorted(glob.glob(os.path.join(input_dir,"*uncal.fits")))
@@ -54,7 +53,7 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
             os.makedirs("crds_cache")
 
         # Process Stage 1.
-        do_stage1(files,outfiles,output_dir,s1_config)
+        do_stage1(files,outfiles,output_dir,s1_config,diagnosticplots_dir)
         
         # Write the config dictionary out as a copy.
         config_outdir = os.path.join(output_dir,"configuration")
