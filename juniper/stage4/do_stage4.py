@@ -10,7 +10,8 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
     """Performs Stage 4 extraction on the given files.
 
     Args:
-        filepaths (list): list of str. Location of the files you want to extract from. The files must be of type *_reduced.nc
+        filepaths (list): list of str. Location of the files you want to extract
+        from. The files must be of type *_reduced.nc
         outfile (str): name to give to the extracted spectra file.
         outdir (str): location of where to save the spectra file to.
         steps (dict): instructions on how to run this stage of the pipeline.
@@ -46,6 +47,11 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
                             time_step=time_step,
                             verbose=steps["verbose"])
     
+    # Need to track xpos, ypos, widths.
+    xpos, ypos, widths = (np.array(segments.disp.values),
+                          np.array(segments.cdisp.values),
+                          np.array(segments.cwidth.values),)
+    
     # Extract 1D spectra.
     if steps["extract_method"] == 'box':
         oneD_spec, oneD_err, wav_sols = extract_1D.box(segments, steps)
@@ -67,10 +73,12 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
     oneD_spec = np.delete(oneD_spec, bad_frames, axis=0)
     oneD_err = np.delete(oneD_err, bad_frames, axis=0)
     wav_sols = np.delete(wav_sols, bad_frames, axis=0)
+    xpos = np.delete(xpos, bad_frames)
+    ypos = np.delete(ypos, bad_frames)
+    widths = np.delete(widths, bad_frames)
     time = np.delete(segments.time.values, bad_frames, axis=0)
     if steps["verbose"] >= 1:
         print("{} integrations deleted from spectra.".format(len(bad_frames)))
-
 
     # Align spectra.
     shifts = []
@@ -83,7 +91,8 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
         oneD_spec = clean_spec.clean_spec(oneD_spec, steps)
 
     # Save everything out.
-    save_s4_output(oneD_spec, oneD_err, time, wav_sols, shifts, segments.details[0], outfile, outdir)
+    save_s4_output(oneD_spec, oneD_err, time, wav_sols, shifts,
+                   xpos, ypos, widths, segments.details[0], outfile, outdir)
 
     # Log.
     if steps["verbose"] >= 1:

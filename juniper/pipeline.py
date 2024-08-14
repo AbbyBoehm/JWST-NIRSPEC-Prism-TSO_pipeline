@@ -175,6 +175,12 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
             output_dir = os.path.join(project_dir,os.path.join(s4_config["output"],run_name))
         diagnosticplots_dir = os.path.join(project_dir, s4_config["diagnostics"])
 
+        # Open all needed directories.
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        if not os.path.exists(diagnosticplots_dir):
+            os.makedirs(diagnosticplots_dir)
+
         # Find files.
         files = sorted(glob.glob(os.path.join(input_dir,"*reduced.nc")))
         fnames = [str.split(f,sep='/')[-1] for f in files]

@@ -77,12 +77,12 @@ def do_stage3(filepaths, outfiles, outdir, steps, plot_dir):
         segments = subtract_background.subtract_background(segments, steps)
 
     # Track motion of the trace.
-    disp_pos, cdisp_pos, moved_ints = [],[],[]
+    disp_pos, cdisp_pos, cdisp_width, moved_ints = [],[],[],[]
     if any((steps["track_disp"],steps["track_spatial"])):
-        segments, disp_pos, cdisp_pos, moved_ints = track_motion.track_pos(segments, steps)
+        segments, disp_pos, cdisp_pos, cdisp_width, moved_ints = track_motion.track_pos(segments, steps)
 
     # Save everything out.
-    save_s3_output(segments, disp_pos, cdisp_pos, moved_ints, outfiles, outdir)
+    save_s3_output(segments, disp_pos, cdisp_pos, cdisp_width, moved_ints, outfiles, outdir)
 
     # Log.
     if steps["verbose"] >= 1:

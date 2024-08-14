@@ -5,18 +5,21 @@ import numpy as np
 from astropy import modeling
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
+from juniper.stage4.align_spec import cross_correlate
 
 def track_pos(segments, inpt_dict):
     """Tracks position of trace in each integration.
 
     Args:
-        segments (xarray): its segments DataSet is the integrations which will be tracked.
+        segments (xarray): its segments DataSet is the integrations which will
+        be tracked.
         inpt_dict (dict): instructions for running this step.
 
     Returns:
-        xarray, list, list, list: the segments array with updated data quality flags, and the disp. positions, cross-disp. positions, and identified indices of bad frames.
+        xarray, list, list, list, list: the segments array with updated data
+        quality flags, and the disp. positions, cross-disp. positions, cross-disp.
+        widths, and identified indices of bad frames.
     """
-
     # Log.
     if inpt_dict["verbose"] >= 1:
         print("Tracking motion of the trace...")
@@ -36,11 +39,16 @@ def track_pos(segments, inpt_dict):
     bad_frame_map = np.zeros_like(segments.data)
     if inpt_dict["track_disp"]:
         dispersion_position = []
+        # Need to make a template.
+        collapsed = np.nansum(segments.data.values[:,:,:], axis=1) # collapse all frames on axis 1
+        template = np.median(collapsed, axis=0) # take median in time
+        template /= np.max(template) # normalise so peak is at 1
         for k in tqdm(range(segments.data.shape[0]),
                     desc='Fitting trace dispersion position in each integration...',
                     disable=(not time_ints)):
             profile = np.nansum(segments.data.values[k,:,:], axis=0)
-            dispersion_position.append(fit_profile(profile,guess_pos=profile.shape[0]*0.20))
+            pos = fit_disp_profile(profile,template=template)
+            dispersion_position.append(pos)
         
         if inpt_dict["reject_disp"]:
             # Flag any integration with sudden movement.
@@ -56,14 +64,17 @@ def track_pos(segments, inpt_dict):
 
     if inpt_dict["track_spatial"]:
         crossdispersion_position = []
+        crossdispersion_width = []
         for k in tqdm(range(segments.data.shape[0]),
                     desc='Fitting trace cross-dispersion position in each integration...',
                     disable=(not time_ints)):
             profile = np.nansum(segments.data.values[k,:,:], axis=1)
-            crossdispersion_position.append(fit_profile(profile,guess_pos=profile.shape[0]*0.50))
+            pos, width = fit_cdisp_profile(profile,guess_pos=profile.shape[0]*0.50,guess_width=1)
+            crossdispersion_position.append(pos)
+            crossdispersion_width.append(width)
 
         if inpt_dict["reject_spatial"]:
-            # Flag any integration with sudden movement.
+            # Flag any integration with sudden movement or blooming/defocusing.
             med_cross, std_cross = np.median(crossdispersion_position), np.std(crossdispersion_position)
 
             for k in tqdm(range(segments.data.shape[0]),
@@ -88,20 +99,39 @@ def track_pos(segments, inpt_dict):
     if time_step:
         timer(time.time()-t0,None,None,None)
 
-    return segments, dispersion_position, crossdispersion_position, bad_k
+    return segments, dispersion_position, crossdispersion_position, crossdispersion_width, bad_k
 
-def fit_profile(profile,guess_pos):
-    """Simple utility to fit a Gaussian profile to the trace position.
+def fit_cdisp_profile(profile,guess_pos,guess_width):
+    """Simple utility to fit a Gaussian profile to the trace cross-dispersion
+    profile. Used to track position and width.
 
     Args:
-        profile (np.array): a dispersion or cross-dispersion profile whose position is to be tracked.
+        profile (np.array): a cross-dispersion profile whose position and width
+        are to be tracked.
         guess_pos (float): initial guess for the position of the source.
+        guess_width (float): initial guess for the width of the source.
+
+    Returns:
+        float, float: the position and sigma width of the profile.
+    """
+    profile = profile/np.max(profile) # normalize amplitude to 1 for ease of fit
+    fitter = modeling.fitting.LevMarLSQFitter()
+    model = modeling.models.Gaussian1D(amplitude=1, mean=guess_pos, stddev=guess_width)
+    fitted_model = fitter(model, [i for i in range(profile.shape[0])], profile)
+    return fitted_model.mean[0], fitted_model.stddev[0]
+
+def fit_disp_profile(profile, template):
+    """Simple utility to cross-correlate a template profile to the trace dispersion
+    profile. Used to track position.
+
+    Args:
+        profile (np.array): a dispersion profile whose position is to be tracked.
+        template (np.array): a median dispersion profile used to look for
+        dispersion-direction displacements.
 
     Returns:
         float: the position of the profile.
     """
     profile = profile/np.max(profile) # normalize amplitude to 1 for ease of fit
-    fitter = modeling.fitting.LevMarLSQFitter()
-    model = modeling.models.Gaussian1D(amplitude=1, mean=guess_pos, stddev=1)
-    fitted_model = fitter(model, [i for i in range(profile.shape[0])], profile)
-    return fitted_model.mean[0]
+    shift = cross_correlate(profile, template, tspc=80, hrf=0.001, tfit=84)
+    return shift
