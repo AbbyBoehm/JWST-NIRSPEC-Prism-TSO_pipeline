@@ -2,7 +2,7 @@ import numpy as np
 
 from exotic_ld import StellarLimbDarkening as SLD
 
-def get_exotic_coefficients(model_type, stellar_params, exoticLD_instructions):
+def get_exotic_coefficients(exoticLD_instructions):
     """Get limb darkening coefficients from ExoTiC-LD.
 
     Args:
@@ -14,7 +14,7 @@ def get_exotic_coefficients(model_type, stellar_params, exoticLD_instructions):
     # Unpack instructions.
     model_type = exoticLD_instructions["LD_model"]
     stellar_params = exoticLD_instructions["stellar_params"]
-    wavelength_range = exoticLD_instructions["wavelength_range"]
+    wavelength_range = 1e4*exoticLD_instructions["wavelength_range"] # factor 1e4 converts micron to AA
     instrument_mode = exoticLD_instructions["instrument_mode"]
     ld_data_path = exoticLD_instructions["ld_data_path"]
     ld_grid = exoticLD_instructions["ld_grid"]

@@ -398,5 +398,46 @@ def read_one_lc(file):
     
     return curves#spectrum, err, waves, shifts, time, details
 
-def save_s5_output():
-    return 'wry'
+def save_s5_output(planets, planets_err, flares, flares_err,
+                   systematics, systematics_err, LD, LD_err,
+                   time, light_curve, outfile, outdir):
+    """Writes out the results of a fit to an xarray file.
+
+    Args:
+        planets (dict): every fitted planet.
+        planets_err (dict): every fitted planet's uncertainties.
+        flares (dict): every fitted flare.
+        flares_err (dict): every fitted flare's uncertainties.
+        systematics (dict): fitted systematics models.
+        systematics_err (dict): uncertainties on systematics models.
+        LD (dict): fitted limb darkening model.
+        LD_err (dict): uncertainties on limb darkening model.
+        time (np.array): timestamps for each flux point.
+        light_curve (np.array): flux at each point in time.
+        outfile (str): name to give the saved file.
+        outdir (str): where to save the file to.
+    """
+    # Convert to xarray.
+    fit = xr.Dataset(data_vars=dict(
+                                    planets=(["detector","planet_ID",], planets),
+                                    planet_errs=(["detector","planet_ID",], planets_err),
+                                    flares=(["detector","flare_ID",], flares),
+                                    flare_errs=(["detector","flare_ID",], flares_err),
+                                    systematics=(["detector",], systematics),
+                                    systematics_err=(["detector",], systematics_err),
+                                    LD=(["detector",], LD),
+                                    LD_err=(["detector",], LD_err),
+                                    light_curve=(["detector", "time"],light_curve),
+                                    ),
+                        coords=dict(
+                               time = (["detector","time"], time),
+                               detector = (["detector"], [i for i in range(light_curve.shape[0])]),
+                               planet_ID = (["planet_ID",], list(planets.keys())),
+                               flare_ID = (["flare_ID",], list(flares.keys())),
+                               ),
+                        attrs=dict(
+                              )
+    )
+
+    # And save that segment as a file.
+    fit.to_netcdf(os.path.join(outdir, '{}.nc'.format(outfile)))

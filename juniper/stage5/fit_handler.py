@@ -37,11 +37,12 @@ def bundle_planets_flares_systematics_and_LD(planets,flares,systematics,LD):
         if "coeffs" not in key:
             continue
         params_to_fit[key] = systematics[key]
-    if any(LD["fit_LDs"]):
-        # We are indeed fitting LDs so we need to tell params_to_fit what it needs to know.
-        params_to_fit["LD_initialguess"] = LD["LD_initialguess"]
-        # It needs to know which ones are fixed and which are fitted.
-        params_to_fit["fit_LDs"] = LD["fit_LDs"]
+    
+    # Whether we are fitting or not, we need the LD info.
+    params_to_fit["LD_initialguess"] = LD["LD_initialguess"]
+    # It needs to know which ones are fixed and which are fitted.
+    params_to_fit["fit_LDs"] = LD["fit_LDs"]
+
     return params_to_fit
 
 def unpack_params_back_to_dicts(params_to_fit, xpos, ypos, widths):
@@ -375,10 +376,9 @@ def build_bounds(params_priors, priors_type):
         priors_type (str): options of 'uniform' or 'gaussian'.
 
     Returns:
-        tuple: the lower and upper bounds on each parameter to fit.
+        list: the lower and upper bounds on each parameter to fit.
     """
-    # Initialize lists for each boundary.
-    #lower_bounds, upper_bounds = [], []
+    # Initialize bounds list.
     bounds = []
 
     # And unpack.
@@ -386,22 +386,155 @@ def build_bounds(params_priors, priors_type):
         if priors_type == 'uniform':
             lower, upper = params_priors[key]
             bounds.append((lower, upper))
-            #lower_bounds.append(lower)
-            #upper_bounds.append(upper)
         elif priors_type == 'gaussian':
             mean, sigma = params_priors[key]
             bounds.append((mean-(5*sigma),mean+(5*sigma)))
-            #lower_bounds.append(mean-(5*sigma))
-            #upper_bounds.append(mean+(5*sigma))
-    #return (lower_bounds, upper_bounds)
     return bounds
 
-def _residuals(params_array, time, light_curve,  params_to_fit, fit_param_keys, xpos, ypos, widths):
+def consolidate_multiple_detectors(detectors):
+    """Consolidates params_array across multiple detectors, allowing some to
+    be kept separate while forcing system parameters to be the same.
+
+    Args:
+        detectors (dict): series of entries describing each detector, which
+        has its own light curve data it is trying to fit.
+
+    Returns:
+        np.array, dict, dict: array-ified version of fitting parameters, and
+        dictionary version, as well as guide to what keys to update.
+    """
+    # Each params_array object has a corresponding fit_param_keys object
+    # which tells us what each parameter is. Parameters like rpN, polyN,
+    # LDN, etc. are allowed to be separated by detector number. But ones
+    # like t_primN, aorN, etc. must be the same.
+    dets = detectors.keys()
+
+    return "WIP!"
+
+def log_likelihood(params_array, params_to_fit, fit_param_keys, time, light_curve, errors,
+                   xpos, ypos, widths):
+    """For emcee. Generates log-likelihood of tested model based on residuals.
+
+    Args:
+        params_array (np.array): the input to emcee and what is being fitted.
+        params_to_fit (dict): the above in dict format, also contains the
+        essential keywords "batman_modelN" and "batman_paramsN" which need
+        to be updated to compute the residuals.
+        fit_param_keys (list of str): used to guide the parameter updates.
+        time (np.array): timestamps of the mid-exposure times for each point.
+        light_curve (np.array): flux at each point in time.
+        errors (np.array): uncertainties on the flux to weight the residuals.
+        xpos (np.array): if detrending w.r.t. position, the dispersion position array.
+        ypos (np.array): if detrending w.r.t. position, the cross-dispersion position array.
+        widths (np.array): if detrending w.r.t. position, the cross-dispersion widths array.
+
+    Returns:
+        float: the log-likelihood, metric of how well the model fit the data
+        given the uncertainties.
+    """
+    # This is as simple as calling the residuals.
+    residuals = _residuals(params_array, time, light_curve, errors, params_to_fit, fit_param_keys,
+                           xpos, ypos, widths)
+    # And then multiplying.
+    log_l = -0.5*residuals
+    return log_l
+
+def log_prior(params_array, priors, priors_type):
+    """For emcee. Generates log-prior of tested model based on priors.
+
+    Args:
+        params_array (np.array): the input to emcee and what is being fitted.
+        priors (np.array): priors on each parameter being fitted.
+        priors_type (str): options are "uniform" or "gaussian". Determines
+        how log-prior is calculated. For uniform you can get 0 or np.inf,
+        while Gaussian priors allow a continuous range of values.
+
+    Returns:
+        float: the log-prior, metric of how much we believe the model parameters
+        could take these values based on a priori knowledge.
+    """
+    # Define the prior function.
+    def prior_func(parameter, prior, priors_type):
+        if priors_type == "gaussian":
+            return np.log(1.0/(np.sqrt(2*np.pi)*prior[1]))-0.5*(parameter-prior[0])**2/prior[1]**2
+        elif priors_type == "uniform":
+            if (prior[0] < parameter and parameter < prior[1]):
+                return 0
+            else:
+                return -np.inf
+
+    # For each parameter, check where it falls in the posterior
+    log_p = 0
+    for param, prior in zip(params_array, priors):
+        log_p += prior_func(param, priors[prior], priors_type)
+    
+    # Check outcome.
+    if np.isnan(log_p):
+        # If we got NaN somehow, we don't want these parameters.
+        return -np.inf
+    elif np.isfinite(log_p):
+        # If it is a finite number, then we will take it.
+        return log_p
+    else:
+        # Then it is a nonfinite number and we also don't want it.
+        return -np.inf
+
+def log_probability(params_array, params_to_fit, fit_param_keys, time, light_curve, errors,
+                    priors, priors_type, xpos, ypos, widths):
+    """For emcee. Generates the log-probability, sum of the log-likelihood
+    and log-prior.
+
+    Args:
+        params_array (np.array): the input to emcee and what is being fitted.
+        params_to_fit (dict): the above in dict format, also contains the
+        essential keywords "batman_modelN" and "batman_paramsN" which need
+        to be updated to compute the residuals.
+        fit_param_keys (list of str): used to guide the parameter updates.
+        time (np.array): timestamps of the mid-exposure times for each point.
+        light_curve (np.array): flux at each point in time.
+        errors (np.array): uncertainties on the flux to weight the residuals.
+        priors (np.array): priors on each parameter being fitted.
+        priors_type (str): options are "uniform" or "gaussian". Determines
+        how log-prior is calculated. For uniform you can get 0 or np.inf,
+        while Gaussian priors allow a continuous range of values.
+        xpos (np.array): if detrending w.r.t. position, the dispersion position array.
+        ypos (np.array): if detrending w.r.t. position, the cross-dispersion position array.
+        widths (np.array): if detrending w.r.t. position, the cross-dispersion widths array.
+
+    Returns:
+        float: the log-probability, metric of how likely emcee is to accept
+        the move.
+    """
+    # The log-prior gives us a quick way to decide if residuals are worth checking.
+    log_p = log_prior(params_array, priors, priors_type)
+
+    # If the log-prior is not a finite number, these parameters are bad.
+    if np.isnan(log_p):
+        return -np.inf
+    if not np.isfinite(log_p):
+        return -np.inf
+    
+    # Let's go get the log-likelihood then.
+    return log_p + log_likelihood(params_array, params_to_fit, fit_param_keys,
+                                  time, light_curve, errors, xpos, ypos, widths)
+
+def get_result_from_post(ndim, flat_samples):
+    params_array = []
+    param_errs_array = []
+    for i in range(ndim):
+        params_array.append(np.percentile(flat_samples[:, i], 50))
+        param_errs_array.append(np.std(flat_samples[:, i]))
+    return np.array(params_array), np.array(param_errs_array)
+
+def _residuals(params_array, time, light_curve, errors, params_to_fit,
+               fit_param_keys, xpos, ypos, widths, give_res=False):
     """Computes the residuals between the full model and the given light curve.
 
     Args:
         params_array (np.array): the array-ified version of params_to_fit.
         time (np.array): mid-exposure time of each point in the light curve.
+        errors (np.array): uncertainties associated with each data point, used
+        in weighting the residuals.
         light_curve (np.array): flux at each point in the light curve.
         params_to_fit (dict): the parameters being fitted, in dict form.
         fit_param_keys (list of str): the keys that are actually getting
@@ -409,6 +542,12 @@ def _residuals(params_array, time, light_curve,  params_to_fit, fit_param_keys, 
         xpos (np.array): if detrending w.r.t. position, the dispersion position array.
         ypos (np.array): if detrending w.r.t. position, the cross-dispersion position array.
         widths (np.array): if detrending w.r.t. position, the cross-dispersion widths array.
+        give_res (bool, optional): if asked, return the residuals as an array, not summed.
+        Defaults to False.
+    
+    Returns:
+        float or np.array: if not give_res, returns the summed residuals to
+        evaluate the goodness of fit. If give_res, returns the residuals array.
     """
     # Turn the array back into a dictionary.
     redicted_params = array_to_dict(params_array, params_to_fit, fit_param_keys)
@@ -422,6 +561,56 @@ def _residuals(params_array, time, light_curve,  params_to_fit, fit_param_keys, 
                                           params_to_fit=redicted_params, fit_param_keys=fit_param_keys)
 
     # And compare to the data.
-    residuals = np.sum((model-light_curve)**2)
+    residuals = np.sum(((model-light_curve)/errors)**2)
 
     return residuals
+
+def _residuals_multi(params_array, time, light_curve, errors, params_to_fit,
+                     fit_param_keys, xpos, ypos, widths, give_res=False):
+    """Computes the residuals between the full models and the given light curves.
+
+    Args:
+        params_array (np.array): the array-ified version of params_to_fit.
+        time (np.array): mid-exposure time of each point in the light curve.
+        errors (np.array): uncertainties associated with each data point, used
+        in weighting the residuals.
+        light_curve (np.array): flux at each point in the light curve.
+        params_to_fit (dict): the parameters being fitted, in dict form.
+        fit_param_keys (list of str): the keys that are actually getting
+        modified during fitting.
+        xpos (np.array): if detrending w.r.t. position, the dispersion position array.
+        ypos (np.array): if detrending w.r.t. position, the cross-dispersion position array.
+        widths (np.array): if detrending w.r.t. position, the cross-dispersion widths array.
+        give_res (bool, optional): if asked, return the residuals as an array, not summed.
+        Defaults to False.
+    
+    Returns:
+        float or np.array: if not give_res, returns the summed residuals to
+        evaluate the goodness of fit. If give_res, returns the residuals array.
+    """
+    # Turn the array back into a dictionary.
+    redicted_params = array_to_dict(params_array, params_to_fit, fit_param_keys)
+
+    # Now handle each detector separately.
+    residuals_full = {}
+    residuals_sum = 0
+    for detector in range(light_curve.shape[0]):
+        lc = light_curve[detector,:]
+        t = time[detector,:]
+        # Then, separate those back into planets, flares, and systematics.
+        planets_fit, flares_fit, systematics_fit, LD_fit = unpack_params_back_to_dicts(redicted_params,
+                                                                                    xpos, ypos, widths)
+        
+        # Now redo the flux model calculation, this time supplying redicted_params as an argument.
+        model, components = models.full_model(time, planets_fit, flares_fit, systematics_fit,
+                                            params_to_fit=redicted_params, fit_param_keys=fit_param_keys)
+
+        # And compare to the data.
+        residuals = ((model-light_curve)/errors)**2
+        residuals_full["detector"+str(detector+1)] = residuals
+        residuals_sum += np.sum(residuals)
+
+    if give_res:
+        return residuals_full
+    # WIP!
+    return residuals_sum

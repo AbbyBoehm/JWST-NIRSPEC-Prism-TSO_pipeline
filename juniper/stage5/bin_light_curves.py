@@ -39,10 +39,12 @@ def bin_light_curves(spectra, inpt_dict):
     # Initialize some lists at the detector level.
     broadband = [] # shape detector x time
     broaderr = [] # shape detector x time
-    broadwave= [] # shape detector
+    broadwave = [] # shape detector
+    broadbins = [] # shape detector
     spec = [] # shape detector x time x central_wavelength
     specerr = [] # shape detector x time x central_wavelength
     specwave = []  # shape detector x central_wavelength
+    specbins = [] # shape detector x wavelength edges
 
     # And begin processing detectors.
     for d in tqdm(range(spectra.spectrum.shape[0]),
@@ -60,6 +62,7 @@ def bin_light_curves(spectra, inpt_dict):
         spec_det = [] # will have shape time x central_wavelength
         specerr_det = []
         specwave_det = [] # will have shape central_wavelength
+        specbins_det = [] # will have shape wavelength edges
 
         # Check for bad columns.
         if inpt_dict["reject_bad_cols"]:
@@ -117,10 +120,13 @@ def bin_light_curves(spectra, inpt_dict):
         broaderr_det = np.ma.sqrt(np.ma.sum(np.square(error),axis=1)) # sum on wavelengths to get error over whole bandpass
         # Getting the central wavelength is simple.
         broadwave_det = np.ma.median(waves)
+        # The wavelength bounds is also straightforward.
+        broadbins_det = np.array([np.ma.min(waves),np.ma.max(waves)])
         # Store both the spectrum and each point's uncertainty.
         broadband.append(broadband_det)
         broaderr.append(broaderr_det)
         broadwave.append(broadwave_det)
+        broadbins.append(broadbins_det)
 
         if (plot_step or save_step):
             # Create diagnostic plot of the broad-band light curve.
@@ -152,11 +158,13 @@ def bin_light_curves(spectra, inpt_dict):
                 bin_spec = np.ma.sum(spectrum[:,l:r],axis=1)
                 bin_err = np.ma.sqrt(np.ma.sum(np.square(error[:,l:r]),axis=1))
                 bin_wave = np.ma.median(waves[l:r])
+                bin_bins = np.array([np.ma.min(waves[l:r]),np.ma.max(waves[l:r])])
         
                 # Store both the spectrum and each point's uncertainty.
                 spec_det.append(bin_spec)
                 specerr_det.append(bin_err)
                 specwave_det.append(bin_wave)
+                specbins_det.append(bin_bins)
 
                 # Progress bar update.
                 pbar.update(1)
@@ -168,11 +176,13 @@ def bin_light_curves(spectra, inpt_dict):
             bin_spec = np.ma.sum(spectrum[:,l:],axis=1)
             bin_err = np.ma.sqrt(np.ma.sum(np.square(error[:,l:]),axis=1))
             bin_wave = np.ma.median(waves[l:])
+            bin_bins = np.array([np.ma.min(waves[l:]),np.ma.max(waves[l:])])
     
             # Store both the spectrum and each point's uncertainty.
             spec_det.append(bin_spec)
             specerr_det.append(bin_err)
             specwave_det.append(bin_wave)
+            specbins_det.append(bin_bins)
 
             # Close the progress bar.
             pbar.close()
@@ -191,25 +201,38 @@ def bin_light_curves(spectra, inpt_dict):
                 bin_spec = np.ma.sum(spectrum[:,wave_bin],axis=1)
                 bin_err = np.ma.sqrt(np.ma.sum(np.square(error[:,wave_bin]),axis=1))
                 bin_wave = np.ma.median(waves[wave_bin])
+                bin_bins = np.array([np.ma.min(waves[wave_bin]),np.ma.max(waves[wave_bin])])
         
                 # Store both the spectrum and each point's uncertainty.
                 spec_det.append(bin_spec)
                 specerr_det.append(bin_err)
                 specwave_det.append(bin_wave)
+                specbins_det.append(bin_bins)
 
         # And store.
         spec.append(spec_det)
         specerr.append(specerr_det)
         specwave.append(specwave_det)
+        specbins.append(specbins_det)
     
+    # FIX: dummy xpos, ypos, widths
+    xpos = np.zeros_like(specwave)
+    ypos = np.zeros_like(specwave)
+    widths = np.zeros_like(specwave)
+
     # Now create an xarray out of this info.
     light_curves = xr.Dataset(data_vars=dict(
                                     broadband=(["detector", "time"], broadband),
                                     broaderr=(["detector", "time"], broaderr),
                                     broadwave=(["detector",],broadwave),
+                                    broadbins=(["detector",],broadbins),
                                     spec=(["detector", "wavelength", "time"], spec),
                                     specerr=(["detector", "wavelength", "time"], specerr),
                                     specwave=(["detector", "wavelength"],specwave),
+                                    specbins=(["detector","wavelength",],specbins),
+                                    xpos=(["detector", "wavelength"],xpos),
+                                    ypos=(["detector", "wavelength"],ypos),
+                                    widths=(["detector", "wavelength"],widths),
                                     ),
                         coords=dict(
                                time = (["detector", "time"], spectra.time.values),

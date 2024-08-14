@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import xarray as xr
 
+from juniper.config.translate_config import make_planets, make_flares, make_systematics, make_LD
 from juniper.util.diagnostics import tqdm_translate, plot_translate
 from juniper.util.datahandling import stitch_spectra, save_s5_output
 from juniper.stage5 import bin_light_curves, LSQfit, MCMCfit
@@ -58,15 +59,90 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
     xrfile = sorted(glob.glob(os.path.join(outdir,"*lightcurves.nc")))[0]
     light_curves = xr.open_dataset(xrfile)
 
-    # Begin fitting of the light curves.
+    # Begin fitting of the light curves by loading the needed dictionaries.
+    planets = make_planets(steps)
+    flares = make_flares(steps)
+    systematics = make_systematics(steps,
+                                   xpos=light_curves.xpos.values,
+                                   ypos=light_curves.ypos.values,
+                                   widths=light_curves.widths.values,)
+    LD = make_LD(steps)
+
+    # Now fit the broadband curves.
     if steps["fit_broadband"]:
         # Fit whatever broad-band light curves are supplied. If more than one is supplied,
         # (i.e. if len(light_curves.detectors.values) > 1), we will fit in parallel.
-        if steps["use_LSQ"]:
-            output = LSQfit()
-    
-    # Save everything out.
-    save_s5_output()
+        if steps["use_LSQ"] and len(light_curves.detectors.values)==1:
+            if steps["verbose"] == 2:
+                print("Linear least squares fitting to a single broadband curve...")
+            planets, flares, systematics, LD = LSQfit.lsqfit_one(time=light_curves.time.values[0,:],
+                                                                 light_curve=light_curves.broadband.values[0,:],
+                                                                 errors=light_curves.broaderr.values[0,:],
+                                                                 waves=light_curves.broadbins.values[0,:],
+                                                                 planets=planets,flares=flares,
+                                                                 systematics=systematics,LD=LD,
+                                                                 inpt_dict=steps)
+            # Save output.
+            planets_err, flares_err, systematics_err, LD_err = planets, flares, systematics, LD
+            save_s5_output(planets, planets_err, flares, flares_err,
+                            systematics, systematics_err, LD, LD_err,
+                            light_curves.time.values[0,:], light_curves.broadband.values[0,:],
+                            outfile+"_broadbandLSQ", outdir)
+
+        elif steps["use_LSQ"] and len(light_curves.detectors.values)!=1:
+            if steps["verbose"] == 2:
+                print("Linear least squares fitting to multiple broadband curves in parallel...")
+            planets, flares, systematics, LD = LSQfit.lsqfit_joint(time=light_curves.time.values[:,:],
+                                                                   light_curve=light_curves.broadband.values[:,:],
+                                                                   errors=light_curves.broaderr.values[:,:],
+                                                                   waves=light_curves.broadbins.values[:,:],
+                                                                   planets=planets,flares=flares,
+                                                                   systematics=systematics,LD=LD,
+                                                                   inpt_dict=steps)
+            # Save output.
+            planets_err, flares_err, systematics_err, LD_err = planets, flares, systematics, LD
+            save_s5_output(planets, planets_err, flares, flares_err,
+                           systematics, systematics_err, LD, LD_err,
+                           light_curves.time.values[:,:], light_curves.broadband.values[:,:],
+                           outfile+"_broadbandLSQ", outdir)
+        
+
+
+        # Now refine those linear fits with MCMC, or just go straight to MCMC if desired.
+        if steps["use_MCMC"] and len(light_curves.detectors.values)==1:
+            if steps["verbose"] == 2:
+                print("Markov Chain Monte Carlo fitting to a single broadband curve...")
+            planets, flares, systematics, LD, p_err, f_err, s_err, L_err = MCMCfit.mcmcfit_one(time=light_curves.time.values[0,:],
+                                                                                               light_curve=light_curves.broadband.values[0,:],
+                                                                                               errors=light_curves.broaderr.values[0,:],
+                                                                                               waves=light_curves.broadbins.values[0,:],
+                                                                                               planets=planets,flares=flares,
+                                                                                               systematics=systematics,LD=LD,
+                                                                                               inpt_dict=steps)
+            
+            # Save output.
+            save_s5_output(planets, p_err, flares, f_err,
+                           systematics, s_err, LD, L_err,
+                           light_curves.time.values[0,:], light_curves.broadband.values[0,:],
+                           outfile+"_broadbandMCMC", outdir)
+        
+        else:
+            if steps["verbose"] == 2:
+                print("Markov Chain Monte Carlo fitting to multiple broadband curves in parallel...")
+            '''
+            planets, flares, systematics, LD, p_err, f_err, s_err, L_err = MCMCfit.mcmcfit_joint(time=light_curves.time.values[0,:],
+                                                                                               light_curve=light_curves.broadband.values[0,:],
+                                                                                               errors=light_curves.broaderr.values[0,:],
+                                                                                               waves=light_curves.broadbins.values[0,:],
+                                                                                               planets=planets,flares=flares,
+                                                                                               systematics=systematics,LD=LD,
+                                                                                               inpt_dict=steps)
+            # Save output.
+            save_s5_output(planets, p_err, flares, f_err,
+                            systematics, s_err, LD, L_err,
+                            light_curves.time.values[0,:], light_curves.broadband.values[0,:],
+                            outfile+"_broadbandMCMC", outdir)
+            '''
     
     # Log.
     if steps["verbose"] >= 1:
