@@ -163,7 +163,7 @@ def s2_to_pipeline(s2_config):
         s2_pipeline[step] = {"skip":True}
 
     # These next ones are fast because they have no args except for skip.
-    for key in ("msaflag","imprint","wavecorr","straylight",
+    for key in ("msa_flagging","imprint","wavecorr","straylight",
                 "fringe","wfss_contam"):
         s2_pipeline[key] = {"skip":(not s2_config["do_{}".format(key)])}
 
@@ -182,7 +182,7 @@ def s2_clean_dict(s2_pipeline, mode):
     """
     # FIX: need to learn what keys are needed in other modes.
     if mode == 'NIRSPEC':
-        bad_keys = ('badpix_selfcal','msaflag','imprint','background',
+        bad_keys = ('badpix_selfcal','msa_flagging','imprint','background',
                     'master_background','straylight','fringe','barshadow',
                     'wfss_contam','residual_fringe','cube_build')
     elif mode == 'MIRI':

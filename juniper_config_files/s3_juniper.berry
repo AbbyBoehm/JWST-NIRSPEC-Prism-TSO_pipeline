@@ -54,6 +54,7 @@ trace_mask      True                                        # bool. Whether to m
 bckg_rows       [0,1,2,-3,-2,-1]                            # list of int. Indices to define as the background region.
 bckg_sigma      3.0                                         # float. The sigma to use when filtering bad pixels.
 bckg_kernel     (31,1)                                      # tuple of odd int. The kernel to use when filtering bad pixels.
+bckg_threshold  10000                                       # float. Signal level to use to help facilitate trace masking. If you want to adjust this, you should open an integration in your dataset and find the lowest value that you would still call part of the trace.
 
 # Step 5: Track x, y displacement of trace in space
 track_disp      True                                        # bool. Whether to track frame motion in the dispersion direction.

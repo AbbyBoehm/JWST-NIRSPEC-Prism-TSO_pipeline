@@ -1,3 +1,4 @@
+import os
 import time
 from tqdm import tqdm
 
@@ -27,7 +28,7 @@ def subtract_background(segments, inpt_dict):
     time_step, time_ints = tqdm_translate(inpt_dict["verbose"])
     # FIX : i'll figure this out later
     plot_step, plot_ints = plot_translate(inpt_dict["show_plots"])
-    save_step, save_plots = plot_translate(inpt_dict["save_plots"])
+    save_step, save_ints = plot_translate(inpt_dict["save_plots"])
 
     # Time step, if asked.
     if time_step:
@@ -38,16 +39,49 @@ def subtract_background(segments, inpt_dict):
     if inpt_dict["trace_mask"]:
         trace_mask = get_trace_mask(median_spatial_filter(np.median(segments.data.values,axis=0),
                                                           sigma=inpt_dict["bckg_sigma"],
-                                                          kernel=inpt_dict["bckg_kernel"]))
+                                                          kernel=inpt_dict["bckg_kernel"]),
+                                    threshold=inpt_dict["bckg_threshold"])
+        
+        if (plot_step or save_step):
+            # Save a diagnostic plot of the trace mask.
+            fig, ax, im = img(trace_mask, aspect=20, title="Integration-level 1/f trace mask",
+                                vmin=0, vmax=1, norm='linear',verbose=inpt_dict["verbose"])
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_ilbs-trace-mask.png"),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show()
+            plt.close()
 
     # Iterate over frames.
     for i in tqdm(range(segments.data.shape[0]),
                   desc = "Removing 1/f noise from calibrated integrations...",
                   disable=(not time_ints)): # for each integration
-        # Correct 1/f noise with group-level background subtraction for that group.
+        # Correct 1/f noise with integration-level background subtraction for that integration.
         segments.data.values[i,:,:], background = colbycol_bckg(segments.data.values[i,:,:],
                                                                 inpt_dict["bckg_rows"],
                                                                 trace_mask)
+        
+        if (plot_step or save_step) and i == 0:
+            # Plot and/or save the background of the first int as an example.
+            fig, ax, im = img(background, aspect=20, title="Int {} background".format(i),
+                                norm='linear',verbose=inpt_dict["verbose"])
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_ilbs-bckg_int{}.png".format(i)),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show()
+            plt.close()
+        if (plot_ints or save_ints):
+            # Plot and/or save every background to be thorough.
+            fig, ax, im = img(background, aspect=20, title="Int {} background".format(i),
+                                norm='linear',verbose=inpt_dict["verbose"])
+            if save_ints:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_ilbs-bckg_int{}.png".format(i)),
+                            dpi=300, bbox_inches='tight')
+            if plot_ints:
+                plt.show()
+            plt.close()
     
     if inpt_dict["verbose"] >= 1:
         print("Integration-level background subtraction complete.")

@@ -38,6 +38,12 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
             output_dir = os.path.join(project_dir,os.path.join(s1_config["output"],run_name))
         diagnosticplots_dir = os.path.join(output_dir, s1_config["diagnostics"])
 
+        # Open all needed directories.
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        if not os.path.exists(diagnosticplots_dir):
+            os.makedirs(diagnosticplots_dir)
+
         # Find files.
         files = sorted(glob.glob(os.path.join(input_dir,"*uncal.fits")))
         outfiles = [None for i in files] # use default names and change uncal to rateints, that's all.
@@ -76,7 +82,13 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             # Add an extra sub-folder to separate this run from other runs.
             output_dir = os.path.join(project_dir,os.path.join(s2_config["output"],run_name))
-        diagnosticplots_dir = os.path.join(project_dir, s2_config["diagnostics"])
+        diagnosticplots_dir = os.path.join(output_dir, s2_config["diagnostics"])
+
+        # Open all needed directories.
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        if not os.path.exists(diagnosticplots_dir):
+            os.makedirs(diagnosticplots_dir)
 
         # Find files.
         files = sorted(glob.glob(os.path.join(input_dir,"*rateints.fits")))
@@ -104,6 +116,7 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             config_name = "s2_{}_juniper.berry".format(run_name)
         shutil.copy(s2_config_path,os.path.join(config_outdir,config_name))
+    
     ### Run Juniper Stage 3: Reduction
     if 3 in stages:
         # Open the config dictionary.
@@ -118,7 +131,13 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             # Add an extra sub-folder to separate this run from other runs.
             output_dir = os.path.join(project_dir,os.path.join(s3_config["output"],run_name))
-        diagnosticplots_dir = os.path.join(project_dir, s3_config["diagnostics"])
+        diagnosticplots_dir = os.path.join(output_dir, s3_config["diagnostics"])
+
+        # Open all needed directories.
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        if not os.path.exists(diagnosticplots_dir):
+            os.makedirs(diagnosticplots_dir)
 
         # Find files.
         files = sorted(glob.glob(os.path.join(input_dir,"*calints.fits")))
@@ -139,6 +158,7 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             config_name = "s3_{}_juniper.berry".format(run_name)
         shutil.copy(s3_config_path,os.path.join(config_outdir,config_name))
+
     ### Run Juniper Stage 4: Extraction
     if 4 in stages:
         # Open the config dictionary.

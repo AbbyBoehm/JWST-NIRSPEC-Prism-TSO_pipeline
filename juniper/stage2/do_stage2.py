@@ -11,10 +11,12 @@ def do_stage2(filepaths, outfiles, outdir, steps, plot_dir):
     """Performs Stage 2 calibration on the given files.
 
     Args:
-        filepaths (list): list of str. Location of the files you want to correct. The files must be of type *_rateints.fits.
+        filepaths (list): list of str. Location of the files you want to correct.
+        The files must be of type *_rateints.fits.
         outfiles (list): lst of str. Names to give to the calibrated files.
         outdir (str): location of where to save the calibrated files to.
-        steps (dict): instructions on how to run this stage of the pipeline. Loaded from the Stage 2 .berry files.
+        steps (dict): instructions on how to run this stage of the pipeline.
+        Loaded from the Stage 2 .berry files.
         plot_dir (str): location to save diagnostic plots to.
     """
     # Log.
@@ -45,10 +47,12 @@ def do_stage2(filepaths, outfiles, outdir, steps, plot_dir):
         # Build the pipeline dictionary.
         s2_pipeline = s2_to_pipeline(steps)
 
-        # Check observing mode and remove unneeded tags.
+        # Check observing mode and remove unneeded tags. TEST: removing this.
+        '''
         with fits.open(filepath) as f:
             mode = f[0].header['INSTRUME']
             s2_pipeline = s2_clean_dict(s2_pipeline, mode)
+        '''
         # Process Spec2Pipeline.
         wrap_stage2jwst.wrap(filepath, outfile, outdir, s2_pipeline)
 

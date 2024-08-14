@@ -24,7 +24,7 @@ flagfrac_upper  0.001                                       # float. Fraction of
 kernel_size     15                                          # int. Kernel to use for median filtering.
 save_flagged    False                                       # bool. Whether to save flagged background exposures to fits files.
 
-do_msaflag      False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to NIRSpec MOS and IFU.
+do_msa_flagging False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies only to NIRSpec MOS and IFU.
 
 # Note: The jwst Spec2Pipeline build of NSClean was not designed for exoplanetary sciences and may misbehave if you use it.
 do_jwstnsclean  False                                       # bool. Whether to perform this step in jwst Spec2Pipeline. Applies to all NIRSpec modes.

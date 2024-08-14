@@ -1,10 +1,13 @@
+import os
 import time
 from tqdm import tqdm
 
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.signal import medfilt
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
+from juniper.util.plotting import img
 
 def iterate_fixed(segments, inpt_dict):
     """Iterate a fixed number of times at specified sigmas to remove cosmic rays.
@@ -75,6 +78,31 @@ def iterate_fixed(segments, inpt_dict):
     
     # Update data flags.
     segments.dq.values = np.where(bad_pix_map != 0, 1, segments.dq.values)
+
+    if (plot_step or save_step):
+        # Create plots of the entire bad_pix_map collapsed in on itself in time.
+        bad_pix_alltime = np.sum(bad_pix_map,axis=0)
+        bad_pix_alltime[bad_pix_alltime>0] = 1
+        fig, ax, im = img(bad_pix_alltime, aspect=20, title='Fixed-iteration DQ flags',
+                          vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
+        if save_step:
+            plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_iterate-fixed_flags.png"),
+                        dpi=300, bbox_inches='tight')
+        if plot_step:
+            plt.show()
+        plt.close()
+    
+    if (plot_ints or save_ints):
+        # Create plots of each frame of the bad_pix_map in time.
+        for i in range(bad_pix_map.shape[0]):
+            fig, ax, im = img(bad_pix_map[i,:,:], aspect=20, title='Fixed-iteration DQ flags',
+                              vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_iterate-fixed_flags_int{}.png".format(i)),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show()
+            plt.close()
 
     # Report outliers found.
     if inpt_dict["verbose"] >= 1:
@@ -160,6 +188,31 @@ def iterate_free(segments, inpt_dict):
     
     # Update data flags.
     segments.dq.values = np.where(bad_pix_map != 0, 1, segments.dq.values)
+
+    if (plot_step or save_step):
+        # Create plots of the entire bad_pix_map collapsed in on itself in time.
+        bad_pix_alltime = np.sum(bad_pix_map,axis=0)
+        bad_pix_alltime[bad_pix_alltime>0] = 1
+        fig, ax, im = img(bad_pix_alltime, aspect=20, title='Free-iteration DQ flags',
+                          vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
+        if save_step:
+            plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_iterate-free_flags.png"),
+                        dpi=300, bbox_inches='tight')
+        if plot_step:
+            plt.show()
+        plt.close()
+    
+    if (plot_ints or save_ints):
+        # Create plots of each frame of the bad_pix_map in time.
+        for i in range(bad_pix_map.shape[0]):
+            fig, ax, im = img(bad_pix_map[i,:,:], aspect=20, title='Free-iteration DQ flags',
+                              vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_iterate-free_flags_int{}.png".format(i)),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show()
+            plt.close()
 
     # Report outliers found.
     if inpt_dict["verbose"] >= 1:

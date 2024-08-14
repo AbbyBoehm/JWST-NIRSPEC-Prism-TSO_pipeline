@@ -61,9 +61,12 @@ def fix_curvature(data, wvs, timer, show, save, verbose, outdir):
     Args:
         data (np.array): 3D rateints data.
         wvs (np.array): 3D wavelength solution.
-        timer (list): bool, bool. Respectively whether to time the whole step and whether to time corrections to each frame.
-        show (list): bool, bool. Respectively whether to plot an overall diagnostic plot and whether to plot diagnostics for every frame.
-        save (list): bool, bool. Respectively whether to save an overall diagnostic plot and whether to save diagnostics for every frame.
+        timer (list): bool, bool. Respectively whether to time the whole step
+        and whether to time corrections to each frame.
+        show (list): bool, bool. Respectively whether to plot an overall
+        diagnostic plot and whether to plot diagnostics for every frame.
+        save (list): bool, bool. Respectively whether to save an overall
+        diagnostic plot and whether to save diagnostics for every frame.
         verbose (int): from 0 to 2. How much logging this step should do.
         outdir (str): where to save output plots to, if applicable.
 
@@ -160,7 +163,8 @@ def write_curve_fixed_file(output_file, shifted_data, shifted_wvs):
     """Write curvature-corrected file.
 
     Args:
-        output_file (str): name of the *calints.fits file we just rolled and are going to overwrite.
+        output_file (str): name of the *calints.fits file we just rolled
+        and are going to overwrite.
         shifted_data (np.array): 3D data that has been rolled.
         shifted_wvs (np.array): 3D wavelength solution that has been rolled.
     """

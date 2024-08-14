@@ -1,5 +1,8 @@
+import os
 import time
+
 import numpy as np
+import matplotlib.pyplot as plt
 
 from juniper.util.cleaning import median_spatial_filter
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
@@ -25,7 +28,7 @@ def mask_flags(segments, inpt_dict):
     plot_step, plot_ints = plot_translate(inpt_dict["show_plots"])
     save_step, save_ints = plot_translate(inpt_dict["save_plots"])
 
-    # TIme this step, if asked.
+    # Time this step, if asked.
     if time_step:
         t0 = time.time()
 
@@ -39,6 +42,31 @@ def mask_flags(segments, inpt_dict):
     dq_mask = np.empty_like(segments.dq.values)
     dq_mask[:, :, :] = np.where(segments.dq.values > 0, 1, 0)
     dq_mask[np.isnan(segments.data.values)] = 1
+
+    if (plot_step or save_step):
+        # Create plots of the entire dq_mask collapsed in on itself in time.
+        dq_alltime = np.sum(dq_mask,axis=0)
+        dq_alltime[dq_alltime>0] = 1
+        fig, ax, im = img(dq_alltime, aspect=20, title='JWST DQ flags',
+                          vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
+        if save_step:
+            plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_JWST_flags.png"),
+                        dpi=300, bbox_inches='tight')
+        if plot_step:
+            plt.show()
+        plt.close()
+    
+    if (plot_ints or save_ints):
+        # Create plots of each frame of the dq_mask in time.
+        for i in range(dq_mask.shape[0]):
+            fig, ax, im = img(dq_mask[i,:,:], aspect=20, title='JWST DQ flags',
+                              vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_JWST_flags_int{}.png".format(i)),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show()
+            plt.close()
 
     # The replacement method can be median time, median space, or None to leave as masked.
     if inpt_dict["flag_replace"] == 'time':

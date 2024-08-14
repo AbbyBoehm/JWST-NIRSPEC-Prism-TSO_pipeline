@@ -10,7 +10,8 @@ def do_stage3(filepaths, outfiles, outdir, steps, plot_dir):
     """Performs Stage 3 reduction on the given files.
 
     Args:
-        filepaths (list): list of str. Location of the files you want to correct. The files must be of type *_calints.fits.
+        filepaths (list): list of str. Location of the files you want to correct.
+        The files must be of type *_calints.fits.
         outfiles (list): lst of str. Names to give to the reduced files.
         outdir (str): location of where to save the reduced files to.
         steps (dict): instructions on how to run this stage of the pipeline.
@@ -34,6 +35,9 @@ def do_stage3(filepaths, outfiles, outdir, steps, plot_dir):
     # Create the output directory if it does not yet exist.
     if not os.path.exists(outdir):
         os.makedirs(outdir)
+
+    # Add the plot_dir to the stes.
+    steps["diagnostic_plots"] = plot_dir
 
     # Open all files and stitch them together.
     segments = stitch_files(filepaths,

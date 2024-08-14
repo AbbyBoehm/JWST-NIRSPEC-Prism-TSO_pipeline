@@ -1,9 +1,13 @@
+import os
 import time
 from tqdm import tqdm
+
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.ndimage import median_filter
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
+from juniper.util.plotting import img
 
 def smooth(segments, inpt_dict):
     """Uses median filtering to smooth outliers.
@@ -57,6 +61,31 @@ def smooth(segments, inpt_dict):
     
     # Update data flags.
     segments.dq.values = np.where(bad_pix_map != 0, 1, segments.dq.values)
+
+    if (plot_step or save_step):
+        # Create plots of the entire bad_pix_map collapsed in on itself in time.
+        bad_pix_alltime = np.sum(bad_pix_map,axis=0)
+        bad_pix_alltime[bad_pix_alltime>0] = 1
+        fig, ax, im = img(bad_pix_alltime, aspect=20, title='Spatial smoothing DQ flags',
+                          vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
+        if save_step:
+            plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-smoothing_flags.png"),
+                        dpi=300, bbox_inches='tight')
+        if plot_step:
+            plt.show()
+        plt.close()
+    
+    if (plot_ints or save_ints):
+        # Create plots of each frame of the bad_pix_map in time.
+        for i in range(bad_pix_map.shape[0]):
+            fig, ax, im = img(bad_pix_map[i,:,:], aspect=20, title='Spatial smoothing DQ flags',
+                              vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-smoothing_flags_int{}.png".format(i)),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show()
+            plt.close()
 
     # Count outliers and log.
     if inpt_dict["verbose"] >= 1:
@@ -175,6 +204,28 @@ def led(segments, inpt_dict):
                 med_filter_image = median_filter(integration,size=5)
                 integration = np.where(S != 0, med_filter_image, integration)
 
+            # Make some plots if asked.
+            if (plot_step or save_step) and k == 0:
+                # Plot the noise model and fine structure model of the first integration.
+                fig, ax, im = img(noise_model, aspect=20, title="LED Noise Model",
+                                  norm='linear', verbose=inpt_dict["verbose"])
+                if save_step:
+                    plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-LED_noise-model_N{}_int{}.png".format(iteration_N, k)),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show()
+                plt.close()
+
+                if inpt_dict["fine_structure"]:
+                    fig, ax, im = img(contrast_image, aspect=20, title="LED Fine Structure Model",
+                                      norm='linear', verbose=inpt_dict["verbose"])
+                    if save_step:
+                        plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-LED_fine-structure-model_N{}_int{}.png".format(iteration_N, k)),
+                                    dpi=300, bbox_inches='tight')
+                    if plot_step:
+                        plt.show()
+                    plt.close()
+
             # Increment iteration number and check if condition to stop iterating is hit.
             iteration_N += 1
             if (inpt_dict["n"] != None and iteration_N > inpt_dict["n"]): # if it has hit the iteration cap
@@ -192,6 +243,31 @@ def led(segments, inpt_dict):
 
     # Update data flags.
     segments.dq.values = np.where(bad_pix_map != 0, 1, segments.dq.values)
+
+    if (plot_step or save_step):
+        # Create plots of the entire bad_pix_map collapsed in on itself in time.
+        bad_pix_alltime = np.sum(bad_pix_map,axis=0)
+        bad_pix_alltime[bad_pix_alltime>0] = 1
+        fig, ax, im = img(bad_pix_alltime, aspect=20, title='Laplacian Edge Detection DQ flags',
+                          vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
+        if save_step:
+            plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-LED_flags.png"),
+                        dpi=300, bbox_inches='tight')
+        if plot_step:
+            plt.show()
+        plt.close()
+    
+    if (plot_ints or save_ints):
+        # Create plots of each frame of the bad_pix_map in time.
+        for i in range(bad_pix_map.shape[0]):
+            fig, ax, im = img(bad_pix_map[i,:,:], aspect=20, title='Laplacian Edge Detection DQ flags',
+                              vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-LED_flags_int{}.png".format(i)),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show()
+            plt.close()
 
     # Log.
     if inpt_dict["verbose"] >= 1:
