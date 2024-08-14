@@ -262,26 +262,31 @@ def read_one_spec(file):
         file (str): path to the .nc file you want to read out.
 
     Returns:
-        np.array, np.array, np.array, np.array, np.array, list: the spectrum,
-        uncertainties, wavelength solutions, alignment shifts, times of
-        mid-exposure for each spectrum, and the observing details which are
-        instrument, detector, filter, and grating.
+        np.array, np.array, np.array, np.array, np.array, np.array, np.array,
+        np.array, list: the spectrum, uncertainties, wavelength solutions,
+        alignment shifts, dispersion/cross-dispersion positions and widths,
+        times of mid-exposure for each spectrum, and the observing details
+        which are instrument, detector, filter, and grating.
     """
     spectra = xr.open_dataset(file)
     spectrum = spectra.spectrum.values
     err = spectra.err.values
     waves = spectra.waves.values
     shifts = spectra.shifts.values
+    xpos = spectra.xpos.values
+    ypos = spectra.ypos.values
+    widths = spectra.widths.values
     time = spectra.time.values
     details = spectra.details.values #[spectra.instrument,spectra.detector,spectra.filter,spectra.grating]
-    return spectrum, err, waves, shifts, time, details
+    return spectrum, err, waves, shifts, xpos, ypos, widths, time, details
 
 def stitch_spectra(files, detector_method, time_step, verbose):
     """Reads in *1Dspec.nc files and concatenates them if needed.
 
     Args:
         files (list of str): paths to all *1Dspec.nc files you intend to process.
-        detector_method (str): if not None, how to handle when 1D spectra from multiple detectors are found.
+        detector_method (str): if not None, how to handle when 1D spectra from
+        multiple detectors are found.
         time_step (bool): whether to report timing with tqdm.
         verbose (int): from 0 to 2. How much logging to do.
 
@@ -299,12 +304,15 @@ def stitch_spectra(files, detector_method, time_step, verbose):
 
     # If there is just one file, we can take it as an xarray and adjust it to have the detector dim.
     if len(files) == 1:
-        spectrum, err, waves, shifts, time, details = read_one_spec(files[0])
+        spectrum, err, waves, shifts, xpos, ypos, widths, time, details = read_one_spec(files[0])
         spectra = xr.Dataset(data_vars=dict(
                                     spectrum=(["detector", "time", "wavelength"], [spectrum,]),
                                     err=(["detector", "time", "wavelength"], [err,]),
                                     waves=(["detector", "time", "wavelength"],[waves,]),
                                     shifts=(["detector", "time"],[shifts,]),
+                                    xpos=(["detector", "time"],[xpos,]),
+                                    ypos=(["detector", "time"],[ypos,]),
+                                    widths=(["detector", "time"],[widths,]),
                                     ),
                         coords=dict(
                                time = (["detector","time"], [time,]),
@@ -317,7 +325,7 @@ def stitch_spectra(files, detector_method, time_step, verbose):
 
     else:
         # Initialize some empty lists.
-        spectra, errors, waves, shifts = [], [], [], [] # the data_vars of the xarray
+        spectra, errors, waves, shifts, xpos, ypos, widths = [], [], [], [], [], [], [] # the data_vars of the xarray
         time = [] # the coords of the xarray
         details = [] # the attributes of the xarray
 
@@ -325,11 +333,14 @@ def stitch_spectra(files, detector_method, time_step, verbose):
         for file in tqdm(files,
                         desc = 'Parsing spectral files...',
                         disable=(not time_step)):
-            spectrum_i, err_i, waves_i, shifts_i, time_i, details_i = read_one_spec(file)
+            spectrum_i, err_i, waves_i, shifts_i, xpos_i, ypos_i, widths_i, time_i, details_i = read_one_spec(file)
             spectra.append(spectrum_i)
             errors.append(err_i)
             waves.append(waves_i)
             shifts.append(shifts_i)
+            xpos.append(xpos_i)
+            ypos.append(ypos_i)
+            widths.append(widths_i)
             time.append(time_i)
             details.append(details_i)
         
@@ -341,6 +352,9 @@ def stitch_spectra(files, detector_method, time_step, verbose):
                                     err=(["detector", "time", "wavelength"], errors),
                                     waves=(["detector", "time", "wavelength"],waves),
                                     shifts=(["detector", "time"],shifts),
+                                    xpos=(["detector", "time"],xpos),
+                                    ypos=(["detector", "time"],ypos),
+                                    widths=(["detector", "time"],widths),
                                     ),
                         coords=dict(
                                time = (["detector","time"], time),
@@ -370,6 +384,15 @@ def stitch_spectra(files, detector_method, time_step, verbose):
             time = np.median(time,axis=0) # should collapse time to roughly the mid-exposure times for all 1D spectra being joined
             shifts = np.array(shifts)
             shifts = np.median(shifts,axis=0) # should be approximately the same since the detectors are parallel 
+
+            # FIX: these should not be the same but i'll figure it out later.
+            xpos = np.array(xpos)
+            xpos = np.median(xpos,axis=0) # should be approximately the same since the detectors are parallel 
+            ypos = np.array(ypos)
+            ypos = np.median(ypos,axis=0) # should be approximately the same since the detectors are parallel 
+            widths = np.array(widths)
+            widths = np.median(widths,axis=0) # should be approximately the same since the detectors are parallel 
+
             for i in range(time.shape[0]):
                 # At every time stamp, grab each spectrum's 1D spec.
                 spec_i = spectra[0][i,:]
@@ -388,6 +411,9 @@ def stitch_spectra(files, detector_method, time_step, verbose):
                                     err=(["detector", "time", "wavelength"], [con_err,]),
                                     waves=(["detector", "time", "wavelength"],[con_waves,]),
                                     shifts=(["detector", "time"],[shifts,]),
+                                    xpos=(["detector", "time"],[xpos,]),
+                                    ypos=(["detector", "time"],[ypos,]),
+                                    widths=(["detector", "time"],[widths,]),
                                     ),
                         coords=dict(
                                time = (["detector", "time"], [time,]),
@@ -414,7 +440,7 @@ def read_one_lc(file):
     """
     curves = xr.open_dataset(file)
     
-    return curves#spectrum, err, waves, shifts, time, details
+    return curves
 
 def save_s5_output(planets, planets_err, flares, flares_err,
                    systematics, systematics_err, LD, LD_err,
@@ -449,48 +475,3 @@ def save_s5_output(planets, planets_err, flares, flares_err,
     
     filename = (os.path.join(outdir, '{}.npy'.format(outfile)))
     np.save(filename,output)
-    '''
-    # Need to unpack nested dictionaries.
-    planet_ID = list(planets.keys())
-    planets = [planets[ID] for ID in planet_ID]
-    planet_errs = [planets_err[ID] for ID in planet_ID]
-
-    flare_ID = list(flares.keys())
-    flares = [flares[ID] for ID in flare_ID]
-    flare_errs = [flares_err[ID] for ID in flare_ID]
-
-    system_ID = list(systematics.keys())    
-    systematics = [systematics[ID] for ID in system_ID]
-    systematics_err = [systematics_err[ID] for ID in system_ID]
-
-    LD_ID = list(LD.keys())
-    LD = [LD[ID] for ID in LD_ID]
-    LD_err = [LD_err[ID] for ID in LD_ID]
-
-    # Convert to xarray.
-    fit = xr.Dataset(data_vars=dict(
-                                    planets=(["planet_ID",], planets),
-                                    planet_errs=(["planet_ID",], planet_errs),
-                                    flares=(["flare_ID",], flares),
-                                    flare_errs=(["flare_ID",], flare_errs),
-                                    systematics=(["system_ID",], systematics),
-                                    systematics_err=(["system_ID",], systematics_err),
-                                    LD=(["LD_ID",], LD),
-                                    LD_err=(["LD_ID",], LD_err),
-                                    light_curve=(["detector", "time"],light_curve),
-                                    ),
-                        coords=dict(
-                               time = (["detector","time"], time),
-                               detector = (["detector"], [i for i in range(light_curve.shape[0])]),
-                               planet_ID = (["planet_ID",], planet_ID),
-                               flare_ID = (["flare_ID",], flare_ID),
-                               system_ID = (["system_ID",], system_ID),
-                               LD_ID = (["LD_ID",], LD_ID)
-                               ),
-                        attrs=dict(
-                              )
-    )
-
-    # And save that segment as a file.
-    fit.to_netcdf(os.path.join(outdir, '{}.nc'.format(outfile)))
-    '''
