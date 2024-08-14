@@ -173,7 +173,7 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             # Add an extra sub-folder to separate this run from other runs.
             output_dir = os.path.join(project_dir,os.path.join(s4_config["output"],run_name))
-        diagnosticplots_dir = os.path.join(project_dir, s4_config["diagnostics"])
+        diagnosticplots_dir = os.path.join(output_dir, s4_config["diagnostics"])
 
         # Open all needed directories.
         if not os.path.exists(output_dir):
@@ -200,6 +200,7 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             config_name = "s4_{}_juniper.berry".format(run_name)
         shutil.copy(s4_config_path,os.path.join(config_outdir,config_name))
+
     ### Run Juniper Stage 5: Binning and Fitting
     if 5 in stages:
         # Open the config dictionary.
@@ -214,7 +215,13 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             # Add an extra sub-folder to separate this run from other runs.
             output_dir = os.path.join(project_dir,os.path.join(s5_config["output"],run_name))
-        diagnosticplots_dir = os.path.join(project_dir, s5_config["diagnostics"])
+        diagnosticplots_dir = os.path.join(output_dir, s5_config["diagnostics"])
+
+        # Open all needed directories.
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        if not os.path.exists(diagnosticplots_dir):
+            os.makedirs(diagnosticplots_dir)
 
         # Find files.
         files = sorted(glob.glob(os.path.join(input_dir,"*1Dspec.nc")))

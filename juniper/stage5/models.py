@@ -27,8 +27,8 @@ def full_model(t, planets, flares, systematics, params_to_fit=None, fit_param_ke
         planet and flare events multiplied by systematic detrending. Every component
         of the model is also output individually as a dictionary.
     """
-    # Initialize planett flux against time as 0s.
-    flx = np.zeros_like(t)
+    # Initialize planett flux against time as 1s.
+    flx = np.ones_like(t)
     # Track individual models as well.
     models = {}
 
@@ -40,16 +40,16 @@ def full_model(t, planets, flares, systematics, params_to_fit=None, fit_param_ke
                                                         fit_param_keys=fit_param_keys,
                                                         batman_params=[planet["batman_params"+planet_ID],],
                                                         batman_model=[planet["batman_model"+planet_ID],])
-        # Add planet's flux contribution into the full model.
-        flx += batman_flux
+        # Multiply planet's flux contribution into the full model.
+        flx *= batman_flux
         models[planet_name] = batman_flux
     
     # Build flare flux.
     for flare_ID in list(flares.keys()):
         flare = flares[flare_ID] # dict, contains flare parameters
         flare_flux = flare_model(t, flare)
-        # Add flare's flux contribution into the full model.
-        flx += flare_flux
+        # Multiply flare's flux contribution into the full model.
+        flx *= flare_flux
         models[flare_ID] = flare_flux
 
     # Build systematics modifier.
