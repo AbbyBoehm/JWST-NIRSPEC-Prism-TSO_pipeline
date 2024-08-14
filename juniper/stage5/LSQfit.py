@@ -7,7 +7,7 @@ from scipy.optimize import minimize
 from juniper.stage5 import batman_handler, fit_handler, exotic_handler
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 
-def lsqfit_one(time, light_curve, errors, waves, planets, flares, systematics, LD, inpt_dict):
+def lsqfit_one(time, light_curve, errors, waves, planets, flares, systematics, LD, inpt_dict, is_spec=False):
     """Performs linear least squares fitting on the given array(s) using scipy.
     Fits a single light curve. Useful for fitting spectroscopic curves.
 
@@ -27,6 +27,9 @@ def lsqfit_one(time, light_curve, errors, waves, planets, flares, systematics, L
         LD (dict): a dictionary describing the limb darkening model, including
         the star's physical characteristics.
         inpt_dict (dict): instructions for running this step.
+        is_spec (bool, optional): whether this is a fit to a spectroscopic
+        curve, in which case certain system parameters are to be locked.
+        Defaults to False.
     
     Returns:
         dict, dict, dict, dict: planets, flares, systematics, and LD updated
@@ -56,7 +59,8 @@ def lsqfit_one(time, light_curve, errors, waves, planets, flares, systematics, L
                                                      event=inpt_dict["event_type"])
     
     # Build a priors dictionary.
-    params_priors = fit_handler.build_priors_dict(planets,flares,systematics,LD)
+    params_priors = fit_handler.build_priors_dict(planets,flares,systematics,LD,
+                                                  is_spec=is_spec)
 
     # Then build the lsq bounds object.
     bounds = fit_handler.build_bounds(params_priors, priors_type=inpt_dict["priors_type"])

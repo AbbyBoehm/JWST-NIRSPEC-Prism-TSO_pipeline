@@ -225,18 +225,18 @@ def bin_light_curves(spectra, inpt_dict):
                                     broadband=(["detector", "time"], broadband),
                                     broaderr=(["detector", "time"], broaderr),
                                     broadwave=(["detector",],broadwave),
-                                    broadbins=(["detector",],broadbins),
+                                    broadbins=(["detector", "edge"],broadbins),
                                     spec=(["detector", "wavelength", "time"], spec),
                                     specerr=(["detector", "wavelength", "time"], specerr),
                                     specwave=(["detector", "wavelength"],specwave),
-                                    specbins=(["detector","wavelength",],specbins),
+                                    specbins=(["detector", "wavelength", "edge"],specbins),
                                     xpos=(["detector", "wavelength"],xpos),
                                     ypos=(["detector", "wavelength"],ypos),
                                     widths=(["detector", "wavelength"],widths),
                                     ),
                         coords=dict(
                                time = (["detector", "time"], spectra.time.values),
-                               detector = (["detector",], [i for i in range(spectra.spectrum.shape[0])]),
+                               detectors = (["detector",], [i for i in range(spectra.spectrum.shape[0])]),
                                details = (["detector","observation_mode"], spectra.details.values), # this has the form Ndetectors x [[INSTRUMENT, DETECTOR, FILTER, GRATING]]
                                ),
                         attrs=dict(

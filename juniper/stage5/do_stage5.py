@@ -82,11 +82,11 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
                                                                  planets=planets,flares=flares,
                                                                  systematics=systematics,LD=LD,
                                                                  inpt_dict=steps)
-            # Save output.
+            # Save output. Needs to be formatted as if there is more than one dimension.
             planets_err, flares_err, systematics_err, LD_err = planets, flares, systematics, LD
             save_s5_output(planets, planets_err, flares, flares_err,
                             systematics, systematics_err, LD, LD_err,
-                            light_curves.time.values[0,:], light_curves.broadband.values[0,:],
+                            light_curves.time.values[:,:], light_curves.broadband.values[:,:],
                             outfile+"_broadbandLSQ", outdir)
 
         elif steps["use_LSQ"] and len(light_curves.detectors.values)!=1:
@@ -144,6 +144,70 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
                             outfile+"_broadbandMCMC", outdir)
             '''
     
+    # Then fit the spectroscopic curves.
+    if steps["fit_spec"]:
+        # Reserve planets, flares, systematics, and LD originals.
+        planets0 = planets.copy()
+        flares0 = flares.copy()
+        systematics0 = systematics.copy()
+        LD0 = LD.copy()
+        
+        # We need to treat one light curve at a time, one detector at a time.
+        for detector in tqdm(light_curves.detectors.values,
+                             desc="Processing each detector's spectrum...",
+                             disable=(not time_step)):
+            for wavelength in tqdm(range(light_curves.specwave.values[detector,:].shape[0]),
+                                   desc='Processing each wavelength in that detector...',
+                                   disable=(not time_ints)):
+                # Fetch the relevant curves and values.
+                time = light_curves.time.values[detector,:]
+                light_curve = light_curves.spec.values[detector,wavelength,:]
+                errors = light_curves.specerr.values[detector,wavelength,:],
+                waves = light_curves.specbins.values[detector,wavelength,:]
+                wavestr = np.round(light_curves.specwave.values[detector,wavelength],3)
+
+                # First, LSQ.
+                if steps["use_LSQ"]:
+                    if steps["verbose"] == 2:
+                        print("Linear least squares fitting to single spectroscopic light curve..")
+                    planets, flares, systematics, LD = LSQfit.lsqfit_one(time=time,
+                                                                         light_curve=light_curve,
+                                                                         errors=errors,
+                                                                         waves=waves,
+                                                                         planets=planets,flares=flares,
+                                                                         systematics=systematics,LD=LD,
+                                                                         inpt_dict=steps,
+                                                                         is_spec=True)
+                    # Save output.
+                    planets_err, flares_err, systematics_err, LD_err = planets, flares, systematics, LD
+                    save_s5_output(planets, planets_err, flares, flares_err,
+                                   systematics, systematics_err, LD, LD_err,
+                                   time, light_curve,
+                                   outfile+"_spec{}LSQ".format(wavestr), outdir)
+                    
+                # Then MCMC.
+                if steps["use_MCMC"]:
+                    if steps["verbose"] == 2:
+                        print("Markov Chain Monte Carlo fitting to single spectroscopic light curve..")
+                    planets, flares, systematics, LD, p_err, f_err, s_err, L_err = MCMCfit.mcmcfit_one(time=time,
+                                                                                                       light_curve=light_curve,
+                                                                                                       errors=errors,
+                                                                                                       waves=waves,
+                                                                                                       planets=planets,flares=flares,
+                                                                                                       systematics=systematics,LD=LD,
+                                                                                                       inpt_dict=steps,
+                                                                                                       is_spec=True)
+            
+                    # Save output.
+                    save_s5_output(planets, p_err, flares, f_err,
+                                   systematics, s_err, LD, L_err,
+                                   time, light_curve,
+                                   outfile+"_spec{}MCMC".format(wavestr), outdir)
+                
+                # Reset planets, etc. to originals.
+                planets, flares, systematics, LD = planets0, flares0, systematics0, LD0
+
+
     # Log.
     if steps["verbose"] >= 1:
         print("Juniper Stage 5 is complete.")

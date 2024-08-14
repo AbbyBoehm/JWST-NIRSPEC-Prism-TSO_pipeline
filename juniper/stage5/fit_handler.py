@@ -313,7 +313,7 @@ def array_to_dict(params_array, params_to_fit, fit_param_keys):
     
     return reorganized_params
 
-def build_priors_dict(planets, flares, systematics, LD):
+def build_priors_dict(planets, flares, systematics, LD, is_spec=False):
     """Simple function to get the priors on every fitting parameter.
 
     Args:
@@ -322,6 +322,9 @@ def build_priors_dict(planets, flares, systematics, LD):
         systematics (dict): series of entries describing systematic trends
         in the model.
         LD (dict): series of entries describing the limb darkening model.
+        is_spec (bool, optional): whether this is a fit to a spectroscopic
+        curve, in which case certain system parameters are to be locked.
+        Defaults to False.
     
     Returns:
         dict: each entry is a list of two numbers and this dict will be fed
@@ -332,6 +335,10 @@ def build_priors_dict(planets, flares, systematics, LD):
 
     # First, gut every planet.
     special_keys = ["rp","fp","t_prim","t_seco","period","aor","incl","ecc","longitude"]
+    if is_spec:
+        # In spectroscopic fits, we only concern ourselves with depth.
+        # Physical system parameters are not to be fit for.
+        special_keys = ["rp","fp"]
     special_keys = [i+"_prior" for i in special_keys]
 
     for i, planet_name in enumerate(planets.keys()):

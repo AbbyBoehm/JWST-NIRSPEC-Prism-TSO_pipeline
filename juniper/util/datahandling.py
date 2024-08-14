@@ -401,7 +401,7 @@ def read_one_lc(file):
 def save_s5_output(planets, planets_err, flares, flares_err,
                    systematics, systematics_err, LD, LD_err,
                    time, light_curve, outfile, outdir):
-    """Writes out the results of a fit to an xarray file.
+    """Writes out the results of a fit to a pickle file.
 
     Args:
         planets (dict): every fitted planet.
@@ -417,23 +417,57 @@ def save_s5_output(planets, planets_err, flares, flares_err,
         outfile (str): name to give the saved file.
         outdir (str): where to save the file to.
     """
+    # Dict everything together.
+    output = {"planets":planets,
+              "planet_errs":planets_err,
+              "flares":flares,
+              "flare_errs":flares_err,
+              "systematics":systematics,
+              "systematic_errs":systematics_err,
+              "LD":LD,
+              "LD_err":LD_err,
+              "time":time,
+              "light_curve":light_curve}
+    
+    filename = (os.path.join(outdir, '{}.npy'.format(outfile)))
+    np.save(filename,output)
+    '''
+    # Need to unpack nested dictionaries.
+    planet_ID = list(planets.keys())
+    planets = [planets[ID] for ID in planet_ID]
+    planet_errs = [planets_err[ID] for ID in planet_ID]
+
+    flare_ID = list(flares.keys())
+    flares = [flares[ID] for ID in flare_ID]
+    flare_errs = [flares_err[ID] for ID in flare_ID]
+
+    system_ID = list(systematics.keys())    
+    systematics = [systematics[ID] for ID in system_ID]
+    systematics_err = [systematics_err[ID] for ID in system_ID]
+
+    LD_ID = list(LD.keys())
+    LD = [LD[ID] for ID in LD_ID]
+    LD_err = [LD_err[ID] for ID in LD_ID]
+
     # Convert to xarray.
     fit = xr.Dataset(data_vars=dict(
-                                    planets=(["detector","planet_ID",], planets),
-                                    planet_errs=(["detector","planet_ID",], planets_err),
-                                    flares=(["detector","flare_ID",], flares),
-                                    flare_errs=(["detector","flare_ID",], flares_err),
-                                    systematics=(["detector",], systematics),
-                                    systematics_err=(["detector",], systematics_err),
-                                    LD=(["detector",], LD),
-                                    LD_err=(["detector",], LD_err),
+                                    planets=(["planet_ID",], planets),
+                                    planet_errs=(["planet_ID",], planet_errs),
+                                    flares=(["flare_ID",], flares),
+                                    flare_errs=(["flare_ID",], flare_errs),
+                                    systematics=(["system_ID",], systematics),
+                                    systematics_err=(["system_ID",], systematics_err),
+                                    LD=(["LD_ID",], LD),
+                                    LD_err=(["LD_ID",], LD_err),
                                     light_curve=(["detector", "time"],light_curve),
                                     ),
                         coords=dict(
                                time = (["detector","time"], time),
                                detector = (["detector"], [i for i in range(light_curve.shape[0])]),
-                               planet_ID = (["planet_ID",], list(planets.keys())),
-                               flare_ID = (["flare_ID",], list(flares.keys())),
+                               planet_ID = (["planet_ID",], planet_ID),
+                               flare_ID = (["flare_ID",], flare_ID),
+                               system_ID = (["system_ID",], system_ID),
+                               LD_ID = (["LD_ID",], LD_ID)
                                ),
                         attrs=dict(
                               )
@@ -441,3 +475,4 @@ def save_s5_output(planets, planets_err, flares, flares_err,
 
     # And save that segment as a file.
     fit.to_netcdf(os.path.join(outdir, '{}.nc'.format(outfile)))
+    '''

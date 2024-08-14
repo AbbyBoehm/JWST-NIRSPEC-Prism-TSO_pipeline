@@ -41,6 +41,7 @@ LSQ_iter        None                                        # int. If not None, 
 use_MCMC        True                                        # bool. Whether to use a Markov Chain Monte Carlo routine to fit parameters with posterior distribution.
 MCMC_chains     20                                          # int. How many chains to run in parallel.
 MCMC_steps      20000                                       # int. How many steps each chain should take before running.
+MCMC_specsteps  5000                                        # int. If not None, use only this many steps for chains in spec curves. They have less parameters to explore so a smaller chain size can be permitted.
 MCMC_burnin     0.20                                        # int > 1 or float < 1. If int, how many steps are regarded as burn-in, independent of MCMC_steps. If float, the fraction of MCMC_steps to be considered burn-in.
 
 priors_type     'uniform'                                   # Str. Options are 'uniform' or 'gaussian'. See priors below for more info. Set this whether you use LSQ, MCMC, or both!

@@ -7,7 +7,7 @@ import emcee
 from juniper.stage5 import batman_handler, fit_handler, exotic_handler
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 
-def mcmcfit_one(time, light_curve, errors, waves, planets, flares, systematics, LD, inpt_dict):
+def mcmcfit_one(time, light_curve, errors, waves, planets, flares, systematics, LD, inpt_dict, is_spec=False):
     """Performs Markov Chain Monte Carlo fitting on the given array(s) using emcee.
     Fits a single light curve. Useful for fitting spectroscopic curves.
 
@@ -27,6 +27,9 @@ def mcmcfit_one(time, light_curve, errors, waves, planets, flares, systematics, 
         LD (dict): a dictionary describing the limb darkening model, including
         the star's physical characteristics.
         inpt_dict (dict): instructions for running this step.
+        is_spec (bool, optional): whether this is a fit to a spectroscopic
+        curve, in which case certain system parameters are to be locked.
+        Defaults to False.
     
     Returns:
         dict, dict, dict, dict: planets, flares, systematics, and LD updated
@@ -56,7 +59,8 @@ def mcmcfit_one(time, light_curve, errors, waves, planets, flares, systematics, 
                                                      event=inpt_dict["event_type"])
     
     # Build a priors dictionary.
-    params_priors = fit_handler.build_priors_dict(planets,flares,systematics,LD)
+    params_priors = fit_handler.build_priors_dict(planets,flares,systematics,LD,
+                                                  is_spec=is_spec)
 
     # Conveniently, the priors also tells us which keys are getting fit.
     fit_param_keys = list(params_priors.keys())
@@ -89,7 +93,10 @@ def mcmcfit_one(time, light_curve, errors, waves, planets, flares, systematics, 
                                           params_priors, inpt_dict["priors_type"], xpos, ypos, widths),)
     
     # And run it!
-    sampler.run_mcmc(pos, inpt_dict["MCMC_steps"], progress=True)#;
+    if (is_spec and inpt_dict["MCMC_specsteps"]):
+        sampler.run_mcmc(pos, inpt_dict["MCMC_specsteps"], progress=True)#;
+    else:
+        sampler.run_mcmc(pos, inpt_dict["MCMC_steps"], progress=True)#;
     
     # Pull the sampled posteriors and discard the burn-in and flatten it.
     samples = sampler.get_chain()
