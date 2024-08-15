@@ -26,7 +26,7 @@ def do_stage2(filepaths, outfiles, outdir, steps, plot_dir):
     if steps["verbose"] == 2:
         print("Stage 2 will operate and output to the following files:")
         for i, f in enumerate(filepaths):
-            print(i, f, "->", outfiles[i])
+            print(i, f, "->", outfiles[i]+".fits")
     
     # Check tqdm and plotting requests.
     time_step, time_ints = tqdm_translate(steps["verbose"])
@@ -47,12 +47,10 @@ def do_stage2(filepaths, outfiles, outdir, steps, plot_dir):
         # Build the pipeline dictionary.
         s2_pipeline = s2_to_pipeline(steps)
 
-        # Check observing mode and remove unneeded tags. TEST: removing this.
-        '''
+        # Check observing mode and remove unneeded tags.
         with fits.open(filepath) as f:
             mode = f[0].header['INSTRUME']
             s2_pipeline = s2_clean_dict(s2_pipeline, mode)
-        '''
         # Process Spec2Pipeline.
         wrap_stage2jwst.wrap(filepath, outfile, outdir, s2_pipeline)
 

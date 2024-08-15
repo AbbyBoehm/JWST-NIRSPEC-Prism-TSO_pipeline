@@ -9,14 +9,14 @@ from scipy import signal
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 
-def align(oneD_spec, oneD_err, wav_sols, time, inpt_dict):
+def align(oneD_spec, oneD_err, wav_sols, oneD_time, inpt_dict):
     """Aligns 1D spectra and uncertainties using cross-correlation.
 
     Args:
         oneD_spec (np.array): extracted 1D spectra.
         oneD_err (np.array): extracted 1D errors.
         wav_sols (np.array): wavelength solutions for each spectrum.
-        time (np.array): timestamps for each spectrum.
+        oneD_time (np.array): timestamps for each spectrum.
         inpt_dict (dict): instructions for running this step.
 
     Returns:
@@ -74,7 +74,7 @@ def align(oneD_spec, oneD_err, wav_sols, time, inpt_dict):
             plt.ylabel('flux [a.u.]')
             plt.title('Shifted spectrum {}'.format(i))
             if save_ints:
-                plt.savefig(os.path.join(inpt_dict['plot_dir'],'shifted_spectrum_{}.png'.format(i)),
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_shifted_spectrum_{}.png'.format(i)),
                             dpi=300, bbox_inches='tight')
             if plot_ints:
                 plt.show(block=True)
@@ -84,25 +84,25 @@ def align(oneD_spec, oneD_err, wav_sols, time, inpt_dict):
     align_err = np.array(align_err)
 
     if (plot_step or save_step):
-        plt.scatter(time, shifts, color='midnightblue')
+        plt.scatter(oneD_time, shifts, color='midnightblue')
         plt.xlabel('time [mjd]')
         plt.ylabel('shift [pix]')
         plt.title('Cross-correlation shifts')
         if save_step:
-            plt.savefig(os.path.join(inpt_dict['plot_dir'],'spectral_shifts.png'),
+            plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_spectral_shifts.png'),
                         dpi=300, bbox_inches='tight')
         if plot_step:
             plt.show(block=True)
         plt.close()
 
         median_shift = np.nanmedian(shifts)
-        plt.scatter(time, shifts, color='midnightblue')
+        plt.scatter(oneD_time, shifts, color='midnightblue')
         plt.xlabel('time [mjd]')
         plt.ylabel('shift [pix]')
         plt.title('Cross-correlation shifts')
         plt.ylim(median_shift*0.8, median_shift*1.2)
         if save_step:
-            plt.savefig(os.path.join(inpt_dict['plot_dir'],'spectral_shifts_zoom.png'),
+            plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_spectral_shifts_zoom.png'),
                         dpi=300, bbox_inches='tight')
         if plot_step:
             plt.show(block=True)
@@ -112,7 +112,7 @@ def align(oneD_spec, oneD_err, wav_sols, time, inpt_dict):
 
 def cross_correlate(spec, template, tspc, hrf, tfit):
     """Cross-correlates the spectrum with the template to find the shift.
-    Adapted from Eureka! optspex method.
+    Adapted from ExoTiC-JEDI align_spectra method.
 
     Args:
         spec (np.array): a 1D spectrum to be cross-correlated.

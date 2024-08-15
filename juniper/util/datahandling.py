@@ -304,6 +304,7 @@ def stitch_spectra(files, detector_method, time_step, verbose):
 
     # If there is just one file, we can take it as an xarray and adjust it to have the detector dim.
     if len(files) == 1:
+        print("Reading out one 1D spectrum...")
         spectrum, err, waves, shifts, xpos, ypos, widths, time, details = read_one_spec(files[0])
         spectra = xr.Dataset(data_vars=dict(
                                     spectrum=(["detector", "time", "wavelength"], [spectrum,]),
@@ -347,6 +348,7 @@ def stitch_spectra(files, detector_method, time_step, verbose):
         # Now check instructions.
         if detector_method == "parallel":
             # We do not join anything. Instead, xarray needs to contain each spectrum separately.
+            print("Parallelising multiple spectra...")
             spectra = xr.Dataset(data_vars=dict(
                                     spectrum=(["detector", "time", "wavelength"], spectra),
                                     err=(["detector", "time", "wavelength"], errors),
@@ -367,6 +369,7 @@ def stitch_spectra(files, detector_method, time_step, verbose):
         
         elif detector_method == "join":
             # Check which detectors you are trying to join and warn the user about heinous combos.
+            print("Joining multiple spectra...")
             gratings = [x[-1] for x in details]
             if any([gratings[0] != grating for grating in gratings]): # if any grating shows up that does not match the first one
                 if verbose >= 1:

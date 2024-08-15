@@ -36,6 +36,7 @@ def smooth(segments, inpt_dict):
     # Track outliers removed and where they were found.
     bad_pix_map = np.zeros_like(segments.data.values)
     bad_pix_removed = 0
+    bad_pix_per_frame = []
 
     # Iterate over each frame and smooth.
     for k in tqdm(range(segments.data.shape[0]),
@@ -52,8 +53,7 @@ def smooth(segments, inpt_dict):
         bad_pix_removed += bad_pix_this_frame
 
         # Count outliers.
-        if inpt_dict["verbose"] == 2:
-            print("Outliers found in this frame: {}".format(bad_pix_this_frame))
+        bad_pix_per_frame.append(bad_pix_this_frame)
 
         # And replace if asked.
         if inpt_dict["space_replace"]:
@@ -62,11 +62,15 @@ def smooth(segments, inpt_dict):
     # Update data flags.
     segments.dq.values = np.where(bad_pix_map != 0, 1, segments.dq.values)
 
+    if inpt_dict["verbose"] == 2:
+        print("Median outliers found in each frame: {} +/- {}".format(int(np.median(bad_pix_per_frame)),
+                                                                      int(np.std((bad_pix_per_frame)))))
+
     if (plot_step or save_step):
         # Create plots of the entire bad_pix_map collapsed in on itself in time.
         bad_pix_alltime = np.sum(bad_pix_map,axis=0)
         bad_pix_alltime[bad_pix_alltime>0] = 1
-        fig, ax, im = img(bad_pix_alltime, aspect=20, title='Spatial smoothing DQ flags',
+        fig, ax, im = img(bad_pix_alltime, aspect=5, title='Spatial smoothing DQ flags',
                           vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
         if save_step:
             plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-smoothing_flags.png"),
@@ -78,7 +82,7 @@ def smooth(segments, inpt_dict):
     if (plot_ints or save_ints):
         # Create plots of each frame of the bad_pix_map in time.
         for i in range(bad_pix_map.shape[0]):
-            fig, ax, im = img(bad_pix_map[i,:,:], aspect=20, title='Spatial smoothing DQ flags',
+            fig, ax, im = img(bad_pix_map[i,:,:], aspect=5, title='Spatial smoothing DQ flags',
                               vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
             if save_step:
                 plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-smoothing_flags_int{}.png".format(i)),
@@ -207,7 +211,7 @@ def led(segments, inpt_dict):
             # Make some plots if asked.
             if (plot_step or save_step) and k == 0:
                 # Plot the noise model and fine structure model of the first integration.
-                fig, ax, im = img(noise_model, aspect=20, title="LED Noise Model",
+                fig, ax, im = img(noise_model, aspect=5, title="LED Noise Model",
                                   norm='linear', verbose=inpt_dict["verbose"])
                 if save_step:
                     plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-LED_noise-model_N{}_int{}.png".format(iteration_N, k)),
@@ -217,7 +221,7 @@ def led(segments, inpt_dict):
                 plt.close()
 
                 if inpt_dict["fine_structure"]:
-                    fig, ax, im = img(contrast_image, aspect=20, title="LED Fine Structure Model",
+                    fig, ax, im = img(contrast_image, aspect=5, title="LED Fine Structure Model",
                                       norm='linear', verbose=inpt_dict["verbose"])
                     if save_step:
                         plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-LED_fine-structure-model_N{}_int{}.png".format(iteration_N, k)),
@@ -248,7 +252,7 @@ def led(segments, inpt_dict):
         # Create plots of the entire bad_pix_map collapsed in on itself in time.
         bad_pix_alltime = np.sum(bad_pix_map,axis=0)
         bad_pix_alltime[bad_pix_alltime>0] = 1
-        fig, ax, im = img(bad_pix_alltime, aspect=20, title='Laplacian Edge Detection DQ flags',
+        fig, ax, im = img(bad_pix_alltime, aspect=5, title='Laplacian Edge Detection DQ flags',
                           vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
         if save_step:
             plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-LED_flags.png"),
@@ -260,7 +264,7 @@ def led(segments, inpt_dict):
     if (plot_ints or save_ints):
         # Create plots of each frame of the bad_pix_map in time.
         for i in range(bad_pix_map.shape[0]):
-            fig, ax, im = img(bad_pix_map[i,:,:], aspect=20, title='Laplacian Edge Detection DQ flags',
+            fig, ax, im = img(bad_pix_map[i,:,:], aspect=5, title='Laplacian Edge Detection DQ flags',
                               vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
             if save_step:
                 plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_spatial-LED_flags_int{}.png".format(i)),

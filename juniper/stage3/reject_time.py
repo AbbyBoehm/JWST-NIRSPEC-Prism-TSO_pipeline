@@ -83,7 +83,7 @@ def iterate_fixed(segments, inpt_dict):
         # Create plots of the entire bad_pix_map collapsed in on itself in time.
         bad_pix_alltime = np.sum(bad_pix_map,axis=0)
         bad_pix_alltime[bad_pix_alltime>0] = 1
-        fig, ax, im = img(bad_pix_alltime, aspect=20, title='Fixed-iteration DQ flags',
+        fig, ax, im = img(bad_pix_alltime, aspect=5, title='Fixed-iteration DQ flags',
                           vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
         if save_step:
             plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_iterate-fixed_flags.png"),
@@ -95,7 +95,7 @@ def iterate_fixed(segments, inpt_dict):
     if (plot_ints or save_ints):
         # Create plots of each frame of the bad_pix_map in time.
         for i in range(bad_pix_map.shape[0]):
-            fig, ax, im = img(bad_pix_map[i,:,:], aspect=20, title='Fixed-iteration DQ flags',
+            fig, ax, im = img(bad_pix_map[i,:,:], aspect=5, title='Fixed-iteration DQ flags',
                               vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
             if save_step:
                 plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_iterate-fixed_flags_int{}.png".format(i)),
@@ -193,7 +193,7 @@ def iterate_free(segments, inpt_dict):
         # Create plots of the entire bad_pix_map collapsed in on itself in time.
         bad_pix_alltime = np.sum(bad_pix_map,axis=0)
         bad_pix_alltime[bad_pix_alltime>0] = 1
-        fig, ax, im = img(bad_pix_alltime, aspect=20, title='Free-iteration DQ flags',
+        fig, ax, im = img(bad_pix_alltime, aspect=5, title='Free-iteration DQ flags',
                           vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
         if save_step:
             plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_iterate-free_flags.png"),
@@ -205,7 +205,7 @@ def iterate_free(segments, inpt_dict):
     if (plot_ints or save_ints):
         # Create plots of each frame of the bad_pix_map in time.
         for i in range(bad_pix_map.shape[0]):
-            fig, ax, im = img(bad_pix_map[i,:,:], aspect=20, title='Free-iteration DQ flags',
+            fig, ax, im = img(bad_pix_map[i,:,:], aspect=5, title='Free-iteration DQ flags',
                               vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
             if save_step:
                 plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_iterate-free_flags_int{}.png".format(i)),

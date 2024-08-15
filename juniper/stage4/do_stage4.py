@@ -25,7 +25,7 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
         print("Stage 4 will operate on the following files:")
         for i, f in enumerate(filepaths):
             print(i, f)
-        print("Output will be saved to {}.".format(outfile))
+        print("Output will be saved to {}.nc.".format(outfile))
     
     # Check tqdm and plotting requests.
     time_step, time_ints = tqdm_translate(steps["verbose"])
@@ -67,7 +67,8 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
         bad_frames = [j for j in segments.flagged[0]]
     if steps["trim_ints"]:
         for trim_ints in steps["trim_ints"]:
-            for i in [j for j in trim_ints if j not in bad_frames]:
+            trim = range(trim_ints[0],trim_ints[1]+1)
+            for i in [j for j in trim if j not in bad_frames]:
                 bad_frames.append(i)
     # Now that all bad frames are found, kick them.
     oneD_spec = np.delete(oneD_spec, bad_frames, axis=0)

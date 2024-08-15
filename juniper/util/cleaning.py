@@ -12,18 +12,29 @@ def median_spatial_filter(data, sigma, kernel):
         kernel (tuple): tuple of two ints which must be odd. Kernal used for median filtering.
 
     Returns:
-        _type_: _description_
+        np.array: cleaned 2D array.
     """
-    '''
-    Cleans one 2D array with median spatial filtering.
-    Adapted from routine developed by Trevor Foote (tof2@cornell.edu).
-    
-    :param data: 2D array. Array that will be median-filtered.
-    :param sigma: float. Sigma at which to reject outliers.
-    :param kernel: tuple of odd int. Kernel to use for median filtering.
-    :return: cleaned 2D array.
-    '''
     medfilt = signal.medfilt2d(data, kernel)
+    diff = data - medfilt
+    temp = sigma_clip(diff, sigma=sigma, axis=0)
+    mask = temp.mask
+    int_mask = mask.astype(float) * medfilt
+    test = (~mask).astype(float)
+    return (data*test) + int_mask
+
+def median_timeseries_filter(data, sigma, kernel):
+    """Cleans one 1D array with median spatial filtering. 
+    Adapted from routine developed by Trevor Foote (tof2@cornell.edu).
+
+    Args:
+        data (np.array): 1D array of data.
+        sigma (float): sigma threshold at which to reject outliers.
+        kernel (tuple): tuple of one ints which must be odd. Kernal used for median filtering.
+
+    Returns:
+        np.array: cleaned 1D array.
+    """
+    medfilt = signal.medfilt(data, kernel)
     diff = data - medfilt
     temp = sigma_clip(diff, sigma=sigma, axis=0)
     mask = temp.mask
@@ -70,7 +81,7 @@ def get_trace_mask(data, threshold=10000):
     mu = np.median(data[data<threshold])
     sig = np.std(data[data<threshold])
 
-    # If the data /positively/ exceeds the mean background level by a 95%
-    # significant amount, it is definitely trace and must be masked.
-    masked_fg = np.ma.masked_where(data - mu > 2*sig, data)
+    # If the data /positively/ exceeds the mean background level even by just
+    # a small amount, it is definitely trace and must be masked.
+    masked_fg = np.ma.masked_where(data - mu > 0.1*sig, data)
     return np.ma.getmask(masked_fg)

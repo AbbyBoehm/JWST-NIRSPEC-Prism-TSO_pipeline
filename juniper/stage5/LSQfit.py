@@ -6,13 +6,14 @@ from scipy.optimize import minimize
 
 from juniper.stage5 import batman_handler, fit_handler, exotic_handler
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
+from juniper.util.cleaning import median_timeseries_filter
 
-def lsqfit_one(time, light_curve, errors, waves, planets, flares, systematics, LD, inpt_dict, is_spec=False):
+def lsqfit_one(lc_time, light_curve, errors, waves, planets, flares, systematics, LD, inpt_dict, is_spec=False):
     """Performs linear least squares fitting on the given array(s) using scipy.
     Fits a single light curve. Useful for fitting spectroscopic curves.
 
     Args:
-        time (np.array): mid-exposure times for each point in the light curve.
+        lc_time (np.array): mid-exposure times for each point in the light curve.
         light_curve (np.array): median-normalized flux with time.
         errors (np.array): uncertainties associated with each data point, used
         in weighting the residuals.
@@ -46,7 +47,19 @@ def lsqfit_one(time, light_curve, errors, waves, planets, flares, systematics, L
     if systematics["pos_detrend"]:
         xpos = systematics["xpos"]
         ypos = systematics["ypos"]
+
+        # Smooth the positions in case the locators had trouble.
+        xpos = median_timeseries_filter(xpos,sigma=3.0,kernel=21)
+        ypos = median_timeseries_filter(ypos,sigma=3.0,kernel=21)
+        
+    if systematics["width_detrend"]:
         widths = systematics["widths"]
+        # Smooth the widths in case the fitter had trouble.
+        widths = median_timeseries_filter(widths,sigma=3.0,kernel=21)
+
+    # If you are doing a poly fit, set the first polynomial coefficient better.
+    if systematics["poly"]:
+        systematics["poly_coeffs"][0] = np.median(light_curve)
 
     # Check if ExoTiC-LD is being used.
     if LD["use_exotic"]:
@@ -55,7 +68,7 @@ def lsqfit_one(time, light_curve, errors, waves, planets, flares, systematics, L
         LD["LD_initialguess"] = exotic_handler.get_exotic_coefficients(LD)
     
     # (Re-)Initialize the planets, giving them the LD info they need to talk to batman properly.
-    planets = batman_handler.batman_init_all_planets(time, planets, LD,
+    planets = batman_handler.batman_init_all_planets(lc_time, planets, LD,
                                                      event=inpt_dict["event_type"])
     
     # Build a priors dictionary.
@@ -80,9 +93,14 @@ def lsqfit_one(time, light_curve, errors, waves, planets, flares, systematics, L
     # Now do lsq.
     results = minimize(fit_handler._residuals,
                        x0=params_array,
-                       args=(time, light_curve, errors, params_to_fit, fit_param_keys, xpos, ypos, widths),
+                       args=(lc_time, light_curve, errors, params_to_fit, fit_param_keys, xpos, ypos, widths),
                        method=inpt_dict["LSQ_type"],
-                       bounds=bounds)
+                       tol=inpt_dict["LSQ_tolerance"],
+                       bounds=bounds,
+                       options={"maxiter":inpt_dict["LSQ_iter"]})
+    
+    if inpt_dict["verbose"] == 2:
+        print(results.message)
     
     # The array is here.
     fitted_array = results.x
@@ -91,29 +109,36 @@ def lsqfit_one(time, light_curve, errors, waves, planets, flares, systematics, L
     fitted_dict = fit_handler.array_to_dict(fitted_array, params_to_fit, fit_param_keys)
 
     # And then turn those back into planets, flares, and systematics.
+    repack_xpos, repack_ypos, repack_widths = [],[],[]
+    if "xpos" in systematics.keys():
+        repack_xpos = systematics["xpos"]
+    if "ypos" in systematics.keys():
+        repack_ypos = systematics["ypos"]
+    if "widths" in systematics.keys():
+        repack_widths = systematics["widths"]
     planets, flares, systematics, LD = fit_handler.unpack_params_back_to_dicts(fitted_dict,
-                                                                               xpos,
-                                                                               ypos,
-                                                                               widths)
+                                                                               repack_xpos,
+                                                                               repack_ypos,
+                                                                               repack_widths)
     
     # Fill in anything that went missing.
     planets, flares, systematics, LD = fit_handler.refill(planets,flares,systematics,LD,
                                                           old_planets,old_flares,old_systematics,old_LD)
     
     # Re-initialize the planets.
-    planets = batman_handler.batman_init_all_planets(time, planets, LD,
+    planets = batman_handler.batman_init_all_planets(lc_time, planets, LD,
                                                      event=inpt_dict["event_type"])
     
     # And return the fitted parameters.
     return planets, flares, systematics, LD
 
-def lsqfit_joint(time, light_curve, errors, waves, planets, flares, systematics, LD, inpt_dict):
+def lsqfit_joint(lc_time, light_curve, errors, waves, planets, flares, systematics, LD, inpt_dict):
     """Performs linear least squares fitting on the given array(s) using scipy.
     Fits multiple light curves simultaneously, forcing them to share system
     parameters (LD, systematics, and depth can be free in each detector).
 
     Args:
-        time (np.array): mid-exposure times for each point in each light curve.
+        lc_time (np.array): mid-exposure times for each point in each light curve.
         light_curve (np.array): median-normalized flux with time.
         errors (np.array): uncertainties associated with each data point, used
         in weighting the residuals.
@@ -144,6 +169,7 @@ def lsqfit_joint(time, light_curve, errors, waves, planets, flares, systematics,
     if systematics["pos_detrend"]:
         xpos = systematics["xpos"]
         ypos = systematics["ypos"]
+    if systematics["width_detrend"]:
         widths = systematics["widths"]
 
     # Check if ExoTiC-LD is being used.
@@ -168,7 +194,7 @@ def lsqfit_joint(time, light_curve, errors, waves, planets, flares, systematics,
     # need to talk to batman properly.
     for detector in detectors.keys():
         D = detectors[detector]
-        D["planets"] = batman_handler.batman_init_all_planets(time, D["planets"], D["LD"],
+        D["planets"] = batman_handler.batman_init_all_planets(lc_time, D["planets"], D["LD"],
                                                               event=inpt_dict["event_type"])
     
         # Build a priors dictionary.
@@ -196,7 +222,7 @@ def lsqfit_joint(time, light_curve, errors, waves, planets, flares, systematics,
     '''
     results = minimize(fit_handler._residuals,
                        x0=params_array,
-                       args=(time, light_curve, errors, params_to_fit, fit_param_keys, xpos, ypos, widths),
+                       args=(lc_time, light_curve, errors, params_to_fit, fit_param_keys, xpos, ypos, widths),
                        method=inpt_dict["LSQ_type"],
                        bounds=bounds)
     
@@ -217,7 +243,7 @@ def lsqfit_joint(time, light_curve, errors, waves, planets, flares, systematics,
                                                           old_planets,old_flares,old_systematics,old_LD)
     
     # Re-initialize the planets.
-    planets = batman_handler.batman_init_all_planets(time, planets, LD,
+    planets = batman_handler.batman_init_all_planets(lc_time, planets, LD,
                                                      event=inpt_dict["event_type"])
     '''
     # WIP!

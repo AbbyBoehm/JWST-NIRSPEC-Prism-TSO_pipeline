@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.special import erfc
 
+from juniper.util.cleaning import median_timeseries_filter
 from juniper.stage5 import batman_handler
 
 def full_model(t, planets, flares, systematics, params_to_fit=None, fit_param_keys=None):
@@ -82,9 +83,16 @@ def full_model(t, planets, flares, systematics, params_to_fit=None, fit_param_ke
     # Position detrend.
     if systematics["pos_detrend"]:
         jitter = systematic_jitter(systematics["xpos"], systematics["ypos"],
-                                   systematics["width"], systematics["pos_detrend_coeffs"])
+                                   systematics["pos_detrend_coeffs"])
         system *= jitter
         models["pos_detrend"] = jitter
+        
+
+    if systematics["width_detrend"]:
+        psf = systematic_psf(systematics["width"],
+                             systematics["width_detrend_coeffs"])
+        system *= psf
+        models["width_detrend"] = psf
 
     # And fold all together.
     return system*flx, models
@@ -151,20 +159,32 @@ def systematic_mirrortilt(t, coeffs):
         flx[coeffs[n][0]:] += coeffs[n][1] # and then after time index [n][0], there is a step of [n][1] which can be up or down
     return flx
 
-def systematic_jitter(xpos, ypos, widths, coeffs):
-    """Returns a polynomial correlated to trace position and width.
+def systematic_jitter(xpos, ypos, coeffs):
+    """Returns a polynomial correlated to trace position.
 
     Args:
         xpos (np.array): dispersion position with time.
         ypos (np.array): cross-dispersion position with time.
-        widths (np.array): cross-dispersion width with time.
         coeffs (list): jitter polynomial fits.
     
     Returns:
-        np.array: mirror tilt step model to be added to Sys(t;A).
+        np.array: jitter model to be added to Sys(t;A).
     """
-    jitter = 1 + coeffs[0]*xpos + coeffs[1]*ypos + coeffs[2]*widths
+    jitter = 1 + coeffs[0]*xpos + coeffs[1]*ypos
     return jitter
+
+def systematic_psf(widths, coeffs):
+    """Returns a polynomial correlated to trace width.
+
+    Args:
+        widths (np.array): cross-dispersion width with time.
+        coeffs (list): width polynomial fits.
+    
+    Returns:
+        np.array: psf model to be added to Sys(t;A).
+    """
+    psf = 1 + coeffs[0]*widths
+    return psf
 
 def flare_model(t, flare):
     """Model of a flare from Tovar Mendoza+ 2022

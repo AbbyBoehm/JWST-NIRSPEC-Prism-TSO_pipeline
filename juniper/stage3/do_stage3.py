@@ -24,7 +24,7 @@ def do_stage3(filepaths, outfiles, outdir, steps, plot_dir):
     if steps["verbose"] == 2:
         print("Stage 3 will operate and output to the following files:")
         for i, f in enumerate(filepaths):
-            print(i, f, "->", outfiles[i])
+            print(i, f, "->", outfiles[i]+".fits")
     
     # Check tqdm and plotting requests.
     time_step, time_ints = tqdm_translate(steps["verbose"])

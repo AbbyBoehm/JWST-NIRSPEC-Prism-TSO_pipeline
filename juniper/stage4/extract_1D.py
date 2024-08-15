@@ -53,6 +53,7 @@ def box(segments, inpt_dict):
         # Start building a mask.
         mask = np.zeros_like(d)
         mask = np.where(np.isnan(w),1,mask) # if the wavelength solution is nan, mask the pixel
+        mask = np.where(np.isnan(d),1,mask) # and mask any nans in the data itself
         if inpt_dict["wavelengths"]:
             # Mask wavelengths that are too short.
             mask = np.where(w < inpt_dict["wavelengths"][0],1,mask)
@@ -84,7 +85,7 @@ def box(segments, inpt_dict):
             plt.imshow(mask)
             plt.title('1D extraction mask')
             if save_step:
-                plt.savefig(os.path.join(inpt_dict['plot_dir'],'1D_extraction_mask_frame0.png'),
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_mask_frame0.png'),
                             dpi=300, bbox_inches='tight')
             if plot_step:
                 plt.show(block=True)
@@ -93,7 +94,7 @@ def box(segments, inpt_dict):
             plt.imshow(mask)
             plt.title('1D extraction mask')
             if save_ints:
-                plt.savefig(os.path.join(inpt_dict['plot_dir'],'1D_extraction_mask_frame{}.png'.format(i)),
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_mask_frame{}.png'.format(i)),
                             dpi=300, bbox_inches='tight')
             if plot_ints:
                 plt.show(block=True)

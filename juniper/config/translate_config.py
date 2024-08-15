@@ -103,10 +103,12 @@ def s2_to_pipeline(s2_config):
         s2_pipeline[key] = s2_config[key]
 
     # First, handle the complex ones with arguments.    
-    s2_pipeline["assign_wcs"] = {"skip":(not s2_config["do_assign_wcs"]),
-                                 "slit_y_low":s2_config["slit_y_low"],
-                                 "slit_y_high":s2_config["slit_y_high"]}
-    
+    s2_pipeline["assign_wcs"] = {"skip":(not s2_config["do_assign_wcs"])}
+    if s2_config["slit_y_low"] and s2_config["slit_y_high"]:
+        s2_pipeline["assign_wcs"] = {"skip":(not s2_config["do_assign_wcs"]),
+                                    "slit_y_low":s2_config["slit_y_low"],
+                                    "slit_y_high":s2_config["slit_y_high"]}
+        
     s2_pipeline["badpix_selfcal"] = {"skip":(not s2_config["do_selfcal"]),
                                      "flagfrac_lower":s2_config["flagfrac_lower"],
                                      "flagfrac_upper":s2_config["flagfrac_upper"],
@@ -331,8 +333,13 @@ def make_systematics(s5_config, xpos, ypos, widths):
         # Then we need the positions and detrending coefficients.
         systematics["xpos"] = xpos
         systematics["ypos"] = ypos
+        systematics["pos_detrend_coeffs"] = [0,0]
+    
+    systematics["width_detrend"] = s5_config["width_detrend"]
+    if systematics["width_detrend"]:
+        # Then we need the width and detrending coefficient.
         systematics["widths"] = widths
-        systematics["pos_detrend_coeffs"] = [0,0,0]
+        systematics["width_detrend_coeffs"] = [0,]
     
     systematics["singleramp"] = s5_config["singleramp"]
     if systematics["singleramp"]:

@@ -53,10 +53,8 @@ star_logg       4.5                                         # float. Log of the 
 
 # Step 3b: Setting up your limb-darkening model
 LD_model        'nonlinear'                                 # str. Which kind of batman LD model to use. Options are 'uniform', 'linear', 'quadratic', 'square-root', 'logarithmic', 'exponential', 'power2' (from Morello et al. 2017), and 'nonlinear'.
-fit_LDs         False                                       # bool. Whether to treat LD coefficients as a free parameter. Only use if you have really good ingress/egress information, otherwise these will be really unconstrained
+fit_LDs         [False,False]                               # bool. Whether to treat LD coefficients as a free parameter. Only use if you have really good ingress/egress information, otherwise these will be really unconstrained
 LD_initialguess [0,0]                                       # list of float. The initial guess of LD coefficient to supply to the LD fitting routine. Only used if exotic_LD is False.
-fit_offset      [False,False]                               # bool. Whether to fit an offset to each LD coefficient in the model.
-LD_offset       [0,0]                                       # list of float. The initial guess of LD coefficient offset to supply to the LD fitting routine. Only used if fit_offset is True.
 
 # Step 3b i: Configuring ExoTiC-LD
 use_exotic      True                                        # bool. If True, ignore LD_initialguess and supply the values produced by ExoTiC-LD instead.
@@ -130,7 +128,8 @@ poly_order      1                                           # float. The order o
 mirrortilt      False                                       # bool. Whether to fit for the specified number of mirror tilt events, which manifest as sudden steps in flux level before and after the tilt.
 n_tilt_events   0                                           # float. The number of tilt events to fit for.
 
-pos_detrend     True                                        # bool. Whether to detrend based on the dispersion position and cross-dispersion position+width measured in Stage 3.
+pos_detrend     True                                        # bool. Whether to detrend based on the dispersion position and cross-dispersion position measured in Stage 3.
+width_detrend   False                                       # bool. Whether to detrend based on the cross-dispersion width measured in Stage 3.
 
 superbias_scale True                                        # bool. Whether to do superbias scaling. WIP!
 

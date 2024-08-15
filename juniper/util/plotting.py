@@ -26,3 +26,39 @@ def img(array, aspect=1, title=None, vmin=None, vmax=None, norm=None, verbose=2)
     plt.colorbar(mappable=im,fraction=min(0.5/aspect,0.15))
     ax.set_title(title)
     return fig, ax, im
+
+def plot_fit(ax, t, lc, lc_err, t_interp, lc_interp):
+    """Plots the fitted model over the data.
+
+    Args:
+        ax (_type_): _description_
+        t (_type_): _description_
+        lc (_type_): _description_
+        lc_err (_type_): _description_
+        t_interp (_type_): _description_
+        lc_interp (_type_): _description_
+    """
+    if lc_err:
+        ax.errorbar(t, lc, yerr=lc_err, fmt='ko')
+    else:
+        ax.scatter(t, lc, color='k')
+    
+    ax.plot(t_interp, lc_interp, color='red')
+    return ax
+
+def plot_res(ax, t, res, lc_err):
+    """Plots the residuals on the given axis.
+
+    Args:
+        ax (_type_): _description_
+        t (_type_): _description_
+        res (_type_): _description_
+        lc_err (_type_): _description_
+    """
+    if lc_err:
+        ax.errorbar(t, res, yerr=lc_err, fmt='ko')
+    else:
+        ax.scatter(t, res, color='k')
+
+    ax.axhline(y=0,color='red',ls='--')
+    return ax

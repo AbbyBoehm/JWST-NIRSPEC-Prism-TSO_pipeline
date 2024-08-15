@@ -1,5 +1,6 @@
 import os
 import time
+from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -34,9 +35,11 @@ def mask_flags(segments, inpt_dict):
 
     # Protect certain flags, if asked.
     if inpt_dict["skip_flags"]:
-        for flag in inpt_dict["skip_flags"]:
+        for flag in tqdm(inpt_dict["skip_flags"],
+                         desc='Removing protected flags...',
+                         disable=(not time_ints)):
             # If this flag is not to be considered, 0 it out.
-            segments.dq.values = segments.dq.where(segments.dq.values == flag, 0, segments.dq.values)
+            segments.dq.values = np.where(segments.dq.values == flag, 0, segments.dq.values)
 
     # Turn dqflags into mask arrays, and add nan mask.
     dq_mask = np.empty_like(segments.dq.values)
@@ -47,7 +50,7 @@ def mask_flags(segments, inpt_dict):
         # Create plots of the entire dq_mask collapsed in on itself in time.
         dq_alltime = np.sum(dq_mask,axis=0)
         dq_alltime[dq_alltime>0] = 1
-        fig, ax, im = img(dq_alltime, aspect=20, title='JWST DQ flags',
+        fig, ax, im = img(dq_alltime, aspect=5, title='JWST DQ flags',
                           vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
         if save_step:
             plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_JWST_flags.png"),
@@ -59,7 +62,7 @@ def mask_flags(segments, inpt_dict):
     if (plot_ints or save_ints):
         # Create plots of each frame of the dq_mask in time.
         for i in range(dq_mask.shape[0]):
-            fig, ax, im = img(dq_mask[i,:,:], aspect=20, title='JWST DQ flags',
+            fig, ax, im = img(dq_mask[i,:,:], aspect=5, title='JWST DQ flags',
                               vmin=0, vmax=1, norm='linear', verbose=inpt_dict["verbose"])
             if save_step:
                 plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_JWST_flags_int{}.png".format(i)),
@@ -75,7 +78,7 @@ def mask_flags(segments, inpt_dict):
         # One filtered image as the median in time.
         replacement = np.median(segments.data.values,axis=0)
         # And replace.
-        segments.data.values = segments.data.where(dq_mask > 0, replacement, segments.data.values)
+        segments.data.values = np.where(dq_mask > 0, replacement, segments.data.values)
 
     elif inpt_dict["flag_replace"] == 'space':
         if inpt_dict["verbose"] == 2:
@@ -87,7 +90,7 @@ def mask_flags(segments, inpt_dict):
                                                        inpt_dict["flag_sigma"],
                                                        inpt_dict["flag_kernel"])
         # And replace.
-        segments.data.values = segments.data.where(dq_mask > 0, replacement, segments.data.values)
+        segments.data.values = np.where(dq_mask > 0, replacement, segments.data.values)
 
     else:
         # No replacement. We ran this step purely to log JWST flags as 1s and 0s, and exclude flags of our choosing.
@@ -96,7 +99,9 @@ def mask_flags(segments, inpt_dict):
     # In the future, having JWST flag information stored in 1s or 0s rather than even integers will be helpful.
     if inpt_dict["verbose"] == 2:
         print("Converting dq array to 1s and 0s for later steps...")
-    segments.dq.values = np.where(segments.dq.values > 0, 1, 0)
+
+    # Update data flags.
+    segments.dq.values = np.where(dq_mask != 0, 1, segments.dq.values)
 
     # Count how many pixels were replaced.
     if inpt_dict["verbose"] >= 1:

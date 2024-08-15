@@ -1,7 +1,10 @@
+import os
 import time
 from tqdm import tqdm
-import numpy as np
 
+import numpy as np
+from scipy.signal import medfilt
+import matplotlib.pyplot as plt
 from astropy import modeling
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
@@ -43,12 +46,58 @@ def track_pos(segments, inpt_dict):
         collapsed = np.nansum(segments.data.values[:,:,:], axis=1) # collapse all frames on axis 1
         template = np.median(collapsed, axis=0) # take median in time
         template /= np.max(template) # normalise so peak is at 1
+        template = medfilt(template, kernel_size=7)
+
+        # Plot the template.
+        if (plot_step or save_step):
+            # Create a plot in time of the measured dispersion positions.
+            plt.figure(figsize=(5,5))
+            plt.plot(template)
+            plt.xlabel('dispersion position [pix]')
+            plt.ylabel('normalised flux [a.u.]')
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_dispersion_template.png"),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show(block=True)
+            plt.close()
+
         for k in tqdm(range(segments.data.shape[0]),
                     desc='Fitting trace dispersion position in each integration...',
                     disable=(not time_ints)):
             profile = np.nansum(segments.data.values[k,:,:], axis=0)
+            profile = profile/np.max(profile) # normalize amplitude to 1 for ease of fit
+            profile = medfilt(profile, kernel_size=7) # filter outliers to reduce their impact on the fit
+            # Plot an example..
+            if (plot_step or save_step) and k == 0:
+                # Create a plot in time of the measured dispersion positions.
+                plt.figure(figsize=(5,5))
+                plt.plot(template, color='k')
+                plt.plot(profile, color='red', ls='--')
+                plt.xlabel('dispersion position [pix]')
+                plt.ylabel('normalised flux [a.u.]')
+                if save_step:
+                    plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_dispersion_example.png"),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show(block=True)
+                plt.close()
             pos = fit_disp_profile(profile,template=template)
             dispersion_position.append(pos)
+
+        # Plot the dispersion positions.
+        if (plot_step or save_step):
+            # Create a plot in time of the measured dispersion positions.
+            plt.figure(figsize=(5,5))
+            plt.scatter(segments.time.values, dispersion_position)
+            plt.xlabel('time [bjd]')
+            plt.ylabel('dispersion shift [pix]')
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_dispersion_shifts.png"),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show(block=True)
+            plt.close()
         
         if inpt_dict["reject_disp"]:
             # Flag any integration with sudden movement.
@@ -72,6 +121,32 @@ def track_pos(segments, inpt_dict):
             pos, width = fit_cdisp_profile(profile,guess_pos=profile.shape[0]*0.50,guess_width=1)
             crossdispersion_position.append(pos)
             crossdispersion_width.append(width)
+
+        # Plot the cross-dispersion positions and widths.
+        if (plot_step or save_step):
+            # Create a plot in time of the measured cross-dispersion positions.
+            plt.figure(figsize=(5,5))
+            plt.scatter(segments.time.values, crossdispersion_position)
+            plt.xlabel('time [bjd]')
+            plt.ylabel('cross-dispersion position [pix]')
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_cross-dispersion_positions.png"),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show(block=True)
+            plt.close()
+
+            # Create a plot in time of the measured cross-dispersion widths.
+            plt.figure(figsize=(5,5))
+            plt.scatter(segments.time.values, crossdispersion_width)
+            plt.xlabel('time [bjd]')
+            plt.ylabel('cross-dispersion width [pix]')
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_cross-dispersion_widths.png"),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show(block=True)
+            plt.close()
 
         if inpt_dict["reject_spatial"]:
             # Flag any integration with sudden movement or blooming/defocusing.
@@ -114,9 +189,9 @@ def fit_cdisp_profile(profile,guess_pos,guess_width):
     Returns:
         float, float: the position and sigma width of the profile.
     """
-    profile = profile/np.max(profile) # normalize amplitude to 1 for ease of fit
+    #profile = profile/np.max(profile) # normalize amplitude to 1 for ease of fit
     fitter = modeling.fitting.LevMarLSQFitter()
-    model = modeling.models.Gaussian1D(amplitude=1, mean=guess_pos, stddev=guess_width)
+    model = modeling.models.Gaussian1D(amplitude=np.max(profile), mean=guess_pos, stddev=guess_width)
     fitted_model = fitter(model, [i for i in range(profile.shape[0])], profile)
     return fitted_model.mean[0], fitted_model.stddev[0]
 
@@ -132,6 +207,5 @@ def fit_disp_profile(profile, template):
     Returns:
         float: the position of the profile.
     """
-    profile = profile/np.max(profile) # normalize amplitude to 1 for ease of fit
-    shift = cross_correlate(profile, template, tspc=80, hrf=0.001, tfit=84)
+    shift = cross_correlate(profile, template, tspc=5, hrf=0.005, tfit=9)
     return shift

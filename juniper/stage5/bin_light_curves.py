@@ -17,7 +17,7 @@ def bin_light_curves(spectra, inpt_dict):
     Args:
         spectra (xarray): its spectrum data_var has shape [detectors, time,
         wavelength], and its waves coord and time coord will be used in binning.
-        inpt_dict (_type_): instructions for running this step.
+        inpt_dict (dict): instructions for running this step.
 
     Returns:
         xarray: light_curves xarray.
@@ -90,7 +90,7 @@ def bin_light_curves(spectra, inpt_dict):
                 plt.xlabel("column #")
                 plt.ylabel("std dev")
                 if save_ints:
-                    plt.savefig(os.path.join(inpt_dict['plot_dir'],'detector{}_standarddeviation.png'.format(d)),
+                    plt.savefig(os.path.join(inpt_dict['plot_dir'],'S5_detector{}_standarddeviation.png'.format(d)),
                                 dpi=300, bbox_inches='tight')
                 if plot_ints:
                     plt.show(block=True)
@@ -103,7 +103,7 @@ def bin_light_curves(spectra, inpt_dict):
                 plt.ylabel("abs(median filtered - true std dev)")
                 plt.ylim(0,0.2)
                 if save_ints:
-                    plt.savefig(os.path.join(inpt_dict['plot_dir'],'detector{}_kickedcolumns.png'.format(d)),
+                    plt.savefig(os.path.join(inpt_dict['plot_dir'],'S5_detector{}_kickedcolumns.png'.format(d)),
                                 dpi=300, bbox_inches='tight')
                 if plot_ints:
                     plt.show(block=True)
@@ -135,7 +135,7 @@ def bin_light_curves(spectra, inpt_dict):
             plt.xlabel("time [mjd]")
             plt.ylabel("flux [a.u.]")
             if save_step:
-                plt.savefig(os.path.join(inpt_dict['plot_dir'],'detector{}_broadband_lc.png'.format(d)),
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'S5_detector{}_broadband_lc.png'.format(d)),
                             dpi=300, bbox_inches='tight')
             if plot_ints:
                 plt.show(block=True)
@@ -214,11 +214,6 @@ def bin_light_curves(spectra, inpt_dict):
         specerr.append(specerr_det)
         specwave.append(specwave_det)
         specbins.append(specbins_det)
-    
-    # FIX: dummy xpos, ypos, widths
-    xpos = np.zeros_like(specwave)
-    ypos = np.zeros_like(specwave)
-    widths = np.zeros_like(specwave)
 
     # Now create an xarray out of this info.
     light_curves = xr.Dataset(data_vars=dict(
@@ -230,9 +225,9 @@ def bin_light_curves(spectra, inpt_dict):
                                     specerr=(["detector", "wavelength", "time"], specerr),
                                     specwave=(["detector", "wavelength"],specwave),
                                     specbins=(["detector", "wavelength", "edge"],specbins),
-                                    xpos=(["detector", "wavelength"],xpos),
-                                    ypos=(["detector", "wavelength"],ypos),
-                                    widths=(["detector", "wavelength"],widths),
+                                    xpos=(["detector", "time"],spectra.xpos.values),
+                                    ypos=(["detector", "time"],spectra.ypos.values),
+                                    widths=(["detector", "time"],spectra.widths.values),
                                     ),
                         coords=dict(
                                time = (["detector", "time"], spectra.time.values),

@@ -46,7 +46,7 @@ def do_stage1(filepaths, outfiles, outdir, steps, plot_dir):
         # Perform group-level background subtraction.
         if steps["do_glbs"]:
             s1_glbs = s1_to_glbs(steps)
-            datamodel = group_level_bckg_sub.glbs(datamodel, s1_glbs, plot_dir)
+            datamodel = group_level_bckg_sub.glbs(datamodel, s1_glbs, plot_dir, outfile)
 
         # Wrap the last steps of Detector1Pipeline.
         result = wrap_stage1jwst.wrap_back_end(datamodel, s1_pipeline, outfile, outdir)

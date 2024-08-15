@@ -111,16 +111,20 @@ def unpack_params_back_to_dicts(params_to_fit, xpos, ypos, widths):
             had_KeyError = True
     
     # We found the planets and the flares. Now to parse the systematics.
-    special_keys = ["poly","mirrortilt","pos_detrend","singleramp","doubleramp"]
-    pos_detrend_keys = ["xpos","ypos","widths"]
+    special_keys = ["poly","mirrortilt","pos_detrend","width_detrend","singleramp","doubleramp"]
+    pos_detrend_keys = ["xpos","ypos",]
+    width_detrend_keys = ["widths",]
     systematics = {}
     for key in special_keys:
         try:
             systematics[key+"_coeffs"] = params_to_fit[key+"_coeffs"]
             systematics[key] = True # if we haven't failed yet, then this must be True.
             if key == "pos_detrend":
-                for key, pos in zip(pos_detrend_keys, (xpos, ypos, widths)):
+                for key, pos in zip(pos_detrend_keys, (xpos, ypos,)):
                     systematics[key] = pos
+            if key == "width_detrend":
+                for key, width in zip(width_detrend_keys, (widths,)):
+                    systematics[key] = width
         except:
             # If this failed, then we were not fitting that kind of systematic.
             systematics[key] = False
@@ -214,7 +218,7 @@ def dict_to_array(params_to_fit, fit_param_keys):
             pass
 
     # Now parse the systematics.
-    special_keys = ["poly","mirrortilt","pos_detrend","singleramp","doubleramp"]
+    special_keys = ["poly","mirrortilt","pos_detrend","width_detrend","singleramp","doubleramp"]
     for key in special_keys:
         # There will always be at least coeff1 in any model. So this is a simple
         # way to check that this model is being fitted.
@@ -267,7 +271,7 @@ def array_to_dict(params_array, params_to_fit, fit_param_keys):
     organized_keys = list(params_to_fit.keys())
 
     # Define systematics keys.
-    special_keys = ["poly","mirrortilt","pos_detrend","singleramp","doubleramp"]
+    special_keys = ["poly","mirrortilt","pos_detrend","width_detrend","singleramp","doubleramp"]
     for i, key in enumerate(fit_param_keys):
         # Some of these keys will be able to be transferred wholesale.
         # The exceptions are systematics models (must be bundled as "model_coeffs")
@@ -358,12 +362,12 @@ def build_priors_dict(planets, flares, systematics, LD, is_spec=False):
                 param_priors[key+str(i+1)] = flare[key+str(i+1)]
     
     # We need to unpack systematic info.
-    special_keys = ["poly","mirrortilt","pos_detrend","singleramp","doubleramp"]
+    special_keys = ["poly","mirrortilt","pos_detrend","width_detrend","singleramp","doubleramp"]
     for key in special_keys:
         if systematics[key]:
-            # If this systematic is included, we need to put a broad bound on every parameter.
+            # If this systematic is included, we need to put a wicked broad bound on every parameter.
             for i,coeff in enumerate(systematics[key+"_coeffs"]):
-                param_priors[key+str(i+1)] = [-1e10,1e10]
+                param_priors[key+str(i+1)] = [-1e20,1e20]
 
     # And LD info, if applicable.
     for i, bool in enumerate(LD["fit_LDs"]):
@@ -533,13 +537,13 @@ def get_result_from_post(ndim, flat_samples):
         param_errs_array.append(np.std(flat_samples[:, i]))
     return np.array(params_array), np.array(param_errs_array)
 
-def _residuals(params_array, time, light_curve, errors, params_to_fit,
+def _residuals(params_array, lc_time, light_curve, errors, params_to_fit,
                fit_param_keys, xpos, ypos, widths, give_res=False):
     """Computes the residuals between the full model and the given light curve.
 
     Args:
         params_array (np.array): the array-ified version of params_to_fit.
-        time (np.array): mid-exposure time of each point in the light curve.
+        lc_time (np.array): mid-exposure time of each point in the light curve.
         errors (np.array): uncertainties associated with each data point, used
         in weighting the residuals.
         light_curve (np.array): flux at each point in the light curve.
@@ -564,7 +568,7 @@ def _residuals(params_array, time, light_curve, errors, params_to_fit,
                                                                                    xpos, ypos, widths)
     
     # Now redo the flux model calculation, this time supplying redicted_params as an argument.
-    model, components = models.full_model(time, planets_fit, flares_fit, systematics_fit,
+    model, components = models.full_model(lc_time, planets_fit, flares_fit, systematics_fit,
                                           params_to_fit=redicted_params, fit_param_keys=fit_param_keys)
 
     # And compare to the data.

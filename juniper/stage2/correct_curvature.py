@@ -45,7 +45,8 @@ def correct_curvature(outfile, outdir, inpt_dict):
                                                       show=[plot_step,plot_ints],
                                                       save=[save_step,save_ints],
                                                       verbose=inpt_dict["verbose"],
-                                                      outdir=inpt_dict["diagnostic_plots"])
+                                                      outdir=inpt_dict["diagnostic_plots"],
+                                                      outfile=outfile)
             write_curve_fixed_file(output_file, shifted_data, shifted_wvs)
     # Log.
     if inpt_dict["verbose"] >= 1:
@@ -55,7 +56,7 @@ def correct_curvature(outfile, outdir, inpt_dict):
     if time_step:
         timer(time.time()-t0,None,None,None)
 
-def fix_curvature(data, wvs, timer, show, save, verbose, outdir):
+def fix_curvature(data, wvs, timer, show, save, verbose, outdir, outfile):
     """Corrects trace curvature in given array. Adapted in part from Eureka!
 
     Args:
@@ -69,6 +70,7 @@ def fix_curvature(data, wvs, timer, show, save, verbose, outdir):
         diagnostic plot and whether to save diagnostics for every frame.
         verbose (int): from 0 to 2. How much logging this step should do.
         outdir (str): where to save output plots to, if applicable.
+        outfile (str): helps keep diagnostic plots distinct.
 
     Returns:
         np.array, np.arrray: corrected data and wvs arrays.
@@ -91,7 +93,7 @@ def fix_curvature(data, wvs, timer, show, save, verbose, outdir):
         plt.title("Rolls needed to correct frames")
         plt.ylim(-13, 13)
         if save_step:
-            plt.savefig(os.path.join(outdir,"S2_curvature_corrections.png"))
+            plt.savefig(os.path.join(outdir,"S2_{}_curvature_corrections.png".format(outfile)))
         if plot_step:
             plt.show(block=True)
         plt.close()
@@ -108,15 +110,15 @@ def fix_curvature(data, wvs, timer, show, save, verbose, outdir):
         if (plot_step or save_step):
             if ((not plot_ints and i == 0) or plot_ints or save_ints): # either if just plot/save the first frame, or plot/save all ints
                 fig, ax, im = img(shifted_data[i,:,:],
-                                  aspect=20,
+                                  aspect=5,
                                   title="Rolled frame {}".format(i),
                                   vmin=0,
                                   vmax=100,
                                   verbose=verbose)
                 if save_step:
-                    plt.savefig(os.path.join(outdir,"S2_corrected_frame{}.png".format(i)))
+                    plt.savefig(os.path.join(outdir,"S2_{}_corrected_frame{}.png".format(outfile,i)))
                 if plot_step:
-                    plt.show()
+                    plt.show(block=True)
                 plt.close()    
     return shifted_data, shifted_wvs
 

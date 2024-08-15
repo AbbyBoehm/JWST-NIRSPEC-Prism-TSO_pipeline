@@ -44,7 +44,7 @@ def subtract_background(segments, inpt_dict):
         
         if (plot_step or save_step):
             # Save a diagnostic plot of the trace mask.
-            fig, ax, im = img(trace_mask, aspect=20, title="Integration-level 1/f trace mask",
+            fig, ax, im = img(trace_mask, aspect=5, title="Integration-level 1/f trace mask",
                                 vmin=0, vmax=1, norm='linear',verbose=inpt_dict["verbose"])
             if save_step:
                 plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_ilbs-trace-mask.png"),
@@ -64,7 +64,7 @@ def subtract_background(segments, inpt_dict):
         
         if (plot_step or save_step) and i == 0:
             # Plot and/or save the background of the first int as an example.
-            fig, ax, im = img(background, aspect=20, title="Int {} background".format(i),
+            fig, ax, im = img(background, aspect=5, title="Int {} background".format(i),
                                 norm='linear',verbose=inpt_dict["verbose"])
             if save_step:
                 plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_ilbs-bckg_int{}.png".format(i)),
@@ -74,7 +74,7 @@ def subtract_background(segments, inpt_dict):
             plt.close()
         if (plot_ints or save_ints):
             # Plot and/or save every background to be thorough.
-            fig, ax, im = img(background, aspect=20, title="Int {} background".format(i),
+            fig, ax, im = img(background, aspect=5, title="Int {} background".format(i),
                                 norm='linear',verbose=inpt_dict["verbose"])
             if save_ints:
                 plt.savefig(os.path.join(inpt_dict["diagnostic_plots"],"S3_ilbs-bckg_int{}.png".format(i)),

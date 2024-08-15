@@ -73,7 +73,7 @@ def clean_spec(oneD_spec, inpt_dict):
             plt.ylabel('flux [a.u.]')
             plt.title('Cleaned spectrum 0')
             if save_step:
-                plt.savefig(os.path.join(inpt_dict['plot_dir'],'cleaned_spec_0.png'),
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_cleaned_spec_0.png'),
                             dpi=300,bbox_inches='tight')
             if plot_step:
                 plt.show(block=True)
@@ -86,7 +86,7 @@ def clean_spec(oneD_spec, inpt_dict):
             plt.ylabel('flux [a.u.]')
             plt.title('Cleaned spectrum {}'.format(i))
             if save_step:
-                plt.savefig(os.path.join(inpt_dict['plot_dir'],'cleaned_spec_{}.png'.format(i)),
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_cleaned_spec_{}.png'.format(i)),
                             dpi=300,bbox_inches='tight')
             if plot_step:
                 plt.show(block=True)
