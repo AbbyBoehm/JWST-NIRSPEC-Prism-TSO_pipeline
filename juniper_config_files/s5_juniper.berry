@@ -59,7 +59,7 @@ LD_initialguess [0,0]                                       # list of float. The
 # Step 3b i: Configuring ExoTiC-LD
 use_exotic      True                                        # bool. If True, ignore LD_initialguess and supply the values produced by ExoTiC-LD instead.
 ld_data_path    None                                        # str. Absolute path to your exotic_ld_data-#.#.# folder.
-ld_grid         "stagger"                                   # str. Which ExoTiC-LD model grid to use. Options are "1D"/"kurucz" or "3D"/"stagger", or None to supply a custom grid.
+ld_grid         "stagger"                                   # str. Which ExoTiC-LD model grid to use. Options are "1D"/"kurucz", "3D"/"stagger", "mps1", "mps2", "phoenix", or None to supply a custom grid.
 custom_grid     None                                        # str. If ld_grid is None, use the grid at this path.
 interpolate     "trilinear"                                 # str. How to interpolate between different models in the grid. Options are "nearest" or "trilinear".
 instrument_mode "JWST_NIRSpec_Prism"                        # str. Specifies which instrument was used for the observations.

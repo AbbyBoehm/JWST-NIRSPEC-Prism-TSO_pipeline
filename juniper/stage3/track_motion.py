@@ -63,7 +63,7 @@ def track_pos(segments, inpt_dict):
             plt.close()
 
         for k in tqdm(range(segments.data.shape[0]),
-                    desc='Fitting trace dispersion position in each integration...',
+                    desc='Fitting trace dispersion position...',
                     disable=(not time_ints)):
             profile = np.nansum(segments.data.values[k,:,:], axis=0)
             profile = profile/np.max(profile) # normalize amplitude to 1 for ease of fit
@@ -115,7 +115,7 @@ def track_pos(segments, inpt_dict):
         crossdispersion_position = []
         crossdispersion_width = []
         for k in tqdm(range(segments.data.shape[0]),
-                    desc='Fitting trace cross-dispersion position in each integration...',
+                    desc='Fitting trace cross-dispersion position and width...',
                     disable=(not time_ints)):
             profile = np.nansum(segments.data.values[k,:,:], axis=1)
             pos, width = fit_cdisp_profile(profile,guess_pos=profile.shape[0]*0.50,guess_width=1)

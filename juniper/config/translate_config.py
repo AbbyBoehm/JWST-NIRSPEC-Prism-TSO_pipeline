@@ -102,12 +102,10 @@ def s2_to_pipeline(s2_config):
     for key in ("verbose","show_plots","save_plots"):
         s2_pipeline[key] = s2_config[key]
 
-    # First, handle the complex ones with arguments.    
-    s2_pipeline["assign_wcs"] = {"skip":(not s2_config["do_assign_wcs"])}
-    if s2_config["slit_y_low"] and s2_config["slit_y_high"]:
-        s2_pipeline["assign_wcs"] = {"skip":(not s2_config["do_assign_wcs"]),
-                                    "slit_y_low":s2_config["slit_y_low"],
-                                    "slit_y_high":s2_config["slit_y_high"]}
+    # First, handle the complex ones with arguments.
+    s2_pipeline["assign_wcs"] = {"skip":(not s2_config["do_assign_wcs"]),
+                                "slit_y_low":s2_config["slit_y_low"],
+                                "slit_y_high":s2_config["slit_y_high"]}
         
     s2_pipeline["badpix_selfcal"] = {"skip":(not s2_config["do_selfcal"]),
                                      "flagfrac_lower":s2_config["flagfrac_lower"],
@@ -188,7 +186,7 @@ def s2_clean_dict(s2_pipeline, mode):
                     'master_background','straylight','fringe','barshadow',
                     'wfss_contam','residual_fringe','cube_build')
     elif mode == 'MIRI':
-        bad_keys = ('msaflag','nsclean','imprint','extract_2d',
+        bad_keys = ('msa_flagging','nsclean','imprint','extract_2d',
                     'master_background','wavecorr','pathloss','barshadow',
                     'wfss_contam','pixel_replace','resample_spec')
     for key in bad_keys:

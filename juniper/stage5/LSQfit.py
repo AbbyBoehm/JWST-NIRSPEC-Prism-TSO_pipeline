@@ -49,13 +49,13 @@ def lsqfit_one(lc_time, light_curve, errors, waves, planets, flares, systematics
         ypos = systematics["ypos"]
 
         # Smooth the positions in case the locators had trouble.
-        xpos = median_timeseries_filter(xpos,sigma=3.0,kernel=21)
-        ypos = median_timeseries_filter(ypos,sigma=3.0,kernel=21)
+        xpos = median_timeseries_filter(xpos,sigma=3.0,kernel=31)
+        ypos = median_timeseries_filter(ypos,sigma=3.0,kernel=31)
         
     if systematics["width_detrend"]:
         widths = systematics["widths"]
         # Smooth the widths in case the fitter had trouble.
-        widths = median_timeseries_filter(widths,sigma=3.0,kernel=21)
+        widths = median_timeseries_filter(widths,sigma=3.0,kernel=31)
 
     # If you are doing a poly fit, set the first polynomial coefficient better.
     if systematics["poly"]:

@@ -53,6 +53,7 @@ def box(segments, inpt_dict):
         # Start building a mask.
         mask = np.zeros_like(d)
         mask = np.where(np.isnan(w),1,mask) # if the wavelength solution is nan, mask the pixel
+        mask = np.where(w==0,1,mask) # also mask where the wavelength solution is 0 nm, that shouldn't happen
         mask = np.where(np.isnan(d),1,mask) # and mask any nans in the data itself
         if inpt_dict["wavelengths"]:
             # Mask wavelengths that are too short.
@@ -67,7 +68,7 @@ def box(segments, inpt_dict):
         # Mask where is outside of the aperture.
         lower, upper = inpt_dict["aperture"]
         mask[0:lower] = 1
-        mask[upper:-1] = 1
+        mask[upper:] = 1
 
         # Now apply the mask to the data and sum it on columns.
         d = np.ma.masked_array(d, mask=mask)
@@ -90,6 +91,16 @@ def box(segments, inpt_dict):
             if plot_step:
                 plt.show(block=True)
             plt.close()
+
+            plt.plot(wav_sols[i,:],oneD_spec[i,:],color='darkblue')
+            plt.title('1D spectrum')
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_spectrum_frame0.png'),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
+                plt.show(block=True)
+            plt.close()
+
         if (plot_ints or save_ints):
             plt.imshow(mask)
             plt.title('1D extraction mask')
@@ -97,6 +108,15 @@ def box(segments, inpt_dict):
                 plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_mask_frame{}.png'.format(i)),
                             dpi=300, bbox_inches='tight')
             if plot_ints:
+                plt.show(block=True)
+            plt.close()
+
+            plt.plot(wav_sols[i,:],oneD_spec[i,:],color='darkblue')
+            plt.title('1D spectrum')
+            if save_step:
+                plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_spectrum_frame{}.png'.format(i)),
+                            dpi=300, bbox_inches='tight')
+            if plot_step:
                 plt.show(block=True)
             plt.close()
 

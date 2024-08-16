@@ -146,6 +146,15 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
     
     # Then fit the spectroscopic curves.
     if steps["fit_spec"]:
+        # Load planets, flares, systematics, and LD from a fitted model, if available.
+        if not steps["fit_broadband"]:
+            try:
+                result = np.load(os.path.join(outdir,outfile+"_broadbandMCMC.npy"), allow_pickle=True).item()
+                planets, flares, systematics, LD = (result['planets'],result['flares'],
+                                                    result['systematics'],result['LD'])
+                print("MCMC broadband fit successfully loaded.")
+            except FileNotFoundError:
+                print("No MCMC results found, proceeding with initial guesses.")
         # Reserve planets, flares, systematics, and LD originals.
         planets0 = planets.copy()
         flares0 = flares.copy()
@@ -165,6 +174,21 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
                 errors = light_curves.specerr.values[detector,wavelength,:],
                 waves = light_curves.specbins.values[detector,wavelength,:]
                 wavestr = np.round(light_curves.specwave.values[detector,wavelength],3)
+
+                # Confirm it's not empty.
+                if all([i == 0 for i in light_curve]) or all([np.isnan(i) for i in light_curve]):
+                    print("Light curve number {} is an empty light curve, passing...".format(wavelength))
+                    continue
+
+                # Confirm it spans more than one wavelength.
+                if waves[0] == waves[1]:
+                    print("Light curve number {} does not span a wavelength range, passing...".format(wavelength))
+                    continue
+
+                # Confirm it is not spanning wavelength 0 nm, for which no photons exist.
+                if 0 in waves:
+                    print("Light curve number {} spans a wavelength range where photons don't exist, passing...".format(wavelength))
+                    continue
 
                 # First, LSQ.
                 if steps["use_LSQ"]:

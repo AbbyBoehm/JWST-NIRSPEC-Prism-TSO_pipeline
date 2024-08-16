@@ -55,8 +55,10 @@ def bin_light_curves(spectra, inpt_dict):
         error = spectra.err.values[d,:,:]
         waves = np.median(spectra.waves.values[d,:,:],axis=0) # median wavelength solution on time axis, has shape wavelength/column
 
-        # Set up a mask for NaN and for bad columns.
+        # Set up a mask for NaN, inf, zero-waves, and bad columns.
         column_mask = np.where(np.isnan(spectrum),1,0) # create a nan mask
+        column_mask = np.where(np.isinf(spectrum),1,column_mask) # mask anywhere the spectrum is inf too
+        column_mask = np.where(waves==0,1,column_mask) # and ignore places with no wavelengths
 
         # Initialize detector-specific lists.
         spec_det = [] # will have shape time x central_wavelength

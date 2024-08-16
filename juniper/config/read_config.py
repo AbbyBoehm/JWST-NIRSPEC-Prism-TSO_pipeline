@@ -64,7 +64,7 @@ def read_config(path_to_config_file):
             # If the parameter is an evaluatable statement (a bool, a list, a numpy object, etc.), make it so.
             param = eval(param)
         except:
-            # It was just a string aftere all.
+            # It was just a string after all.
             pass
         
         # And put it in the dictionary.

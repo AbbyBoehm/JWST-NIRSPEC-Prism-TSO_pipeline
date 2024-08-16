@@ -21,6 +21,8 @@ def get_exotic_coefficients(exoticLD_instructions):
     custom_grid = exoticLD_instructions["custom_grid"]
     interpolate = exoticLD_instructions["interpolate"]
 
+    print("Generating custom LDs for wavelength range [AA]:", wavelength_range)
+
     # Check for custom model, indicated by ld_grid == None. If there is a custom model,
     # generate SLD from that.
     if not ld_grid:
