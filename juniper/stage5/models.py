@@ -112,7 +112,7 @@ def systematic_polynomial(t, coeffs):
 
     # And populate.
     for n, o in enumerate(coeffs):
-        poly += np.array(o*(t**n), dtype='float64')
+        poly += np.array(o*((t-t[0])**n), dtype='float64')
     
     return poly
 
@@ -126,7 +126,7 @@ def systematic_expramp(t, coeffs):
     Returns:
         np.array: single ramp model to be added to Sys(t;A).
     """
-    single_ramp = 1 + coeffs[0]*np.exp(coeffs[1]*t + coeffs[2])
+    single_ramp = 1 + coeffs[0]*np.exp(coeffs[1]*(t-t[0]) + coeffs[2])
     return single_ramp
 
 def systematic_doubleramp(t, coeffs):
@@ -139,8 +139,8 @@ def systematic_doubleramp(t, coeffs):
     Returns:
         np.array: double ramp model to be added to Sys(t;A).
     """
-    double_ramp = (1 + coeffs[0]*np.exp(coeffs[1]*t + coeffs[2])
-                     + coeffs[3]*np.exp(-coeffs[4]*t + coeffs[5]))
+    double_ramp = (1 + coeffs[0]*np.exp(coeffs[1]*(t-t[0]) + coeffs[2])
+                     + coeffs[3]*np.exp(-coeffs[4]*(t-t[0]) + coeffs[5]))
     return double_ramp
 
 def systematic_mirrortilt(t, coeffs):

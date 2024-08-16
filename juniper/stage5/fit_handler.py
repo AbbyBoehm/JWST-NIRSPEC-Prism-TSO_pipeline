@@ -113,7 +113,7 @@ def unpack_params_back_to_dicts(params_to_fit, xpos, ypos, widths):
     # We found the planets and the flares. Now to parse the systematics.
     special_keys = ["poly","mirrortilt","pos_detrend","width_detrend","singleramp","doubleramp"]
     pos_detrend_keys = ["xpos","ypos",]
-    width_detrend_keys = ["widths",]
+    width_detrend_keys = ["width",]
     systematics = {}
     for key in special_keys:
         try:

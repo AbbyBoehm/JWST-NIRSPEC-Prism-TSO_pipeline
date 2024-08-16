@@ -53,7 +53,7 @@ def lsqfit_one(lc_time, light_curve, errors, waves, planets, flares, systematics
         ypos = median_timeseries_filter(ypos,sigma=3.0,kernel=31)
         
     if systematics["width_detrend"]:
-        widths = systematics["widths"]
+        widths = systematics["width"]
         # Smooth the widths in case the fitter had trouble.
         widths = median_timeseries_filter(widths,sigma=3.0,kernel=31)
 
@@ -114,8 +114,8 @@ def lsqfit_one(lc_time, light_curve, errors, waves, planets, flares, systematics
         repack_xpos = systematics["xpos"]
     if "ypos" in systematics.keys():
         repack_ypos = systematics["ypos"]
-    if "widths" in systematics.keys():
-        repack_widths = systematics["widths"]
+    if "width" in systematics.keys():
+        repack_widths = systematics["width"]
     planets, flares, systematics, LD = fit_handler.unpack_params_back_to_dicts(fitted_dict,
                                                                                repack_xpos,
                                                                                repack_ypos,
@@ -170,7 +170,7 @@ def lsqfit_joint(lc_time, light_curve, errors, waves, planets, flares, systemati
         xpos = systematics["xpos"]
         ypos = systematics["ypos"]
     if systematics["width_detrend"]:
-        widths = systematics["widths"]
+        widths = systematics["width"]
 
     # Check if ExoTiC-LD is being used.
     if LD["use_exotic"]:

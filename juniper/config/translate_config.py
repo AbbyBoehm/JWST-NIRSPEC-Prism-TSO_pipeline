@@ -336,7 +336,7 @@ def make_systematics(s5_config, xpos, ypos, widths):
     systematics["width_detrend"] = s5_config["width_detrend"]
     if systematics["width_detrend"]:
         # Then we need the width and detrending coefficient.
-        systematics["widths"] = widths
+        systematics["width"] = widths
         systematics["width_detrend_coeffs"] = [0,]
     
     systematics["singleramp"] = s5_config["singleramp"]

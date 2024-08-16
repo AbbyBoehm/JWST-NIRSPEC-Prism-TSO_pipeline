@@ -50,4 +50,5 @@ def get_exotic_coefficients(exoticLD_instructions):
     if model_type == "nonlinear":
         LDs = sld.compute_4_parameter_non_linear_ld_coeffs(wavelength_range=wavelength_range,
                                                            mode=instrument_mode,mu_min=0.0)
+    LDs = [i for i in LDs]
     return LDs
