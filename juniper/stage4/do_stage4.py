@@ -53,11 +53,7 @@ def do_stage4(filepaths, outfile, outdir, steps, plot_dir):
                           np.array(segments.cwidth.values),)
     
     # Extract 1D spectra.
-    if steps["extract_method"] == 'box':
-        oneD_spec, oneD_err, wav_sols = extract_1D.box(segments, steps)
-    
-    elif steps["extract_method"] == 'optimum':
-        oneD_spec, oneD_err, wav_sols = extract_1D.optimum(segments, steps)
+    oneD_spec, oneD_err, wav_sols = extract_1D.extract(segments, steps)
 
     # Kick unwanted integrations.
     if steps["verbose"] >= 1:

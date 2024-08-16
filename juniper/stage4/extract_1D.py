@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 
-def box(segments, inpt_dict):
-    """The simplest form of spectal extraction, this method sums the flux
-    contained in the aperture with no weighting.
+def extract(segments, inpt_dict):
+    """Extract the 1D spectral flux using either standard (box) extraction
+    or the optimum method of Horne 1986.
 
     Args:
         segments (xarray): its data DataSet contains the integrations to
@@ -23,7 +23,7 @@ def box(segments, inpt_dict):
     """
     # Log.
     if inpt_dict["verbose"] >= 1:
-        print("Extracting 1D spectrum with standard (box) method...")
+        print("Extracting 1D spectrum with {} method...".format(inpt_dict["extract_method"]))
 
     # Check tqdm and plotting requests.
     time_step, time_ints = tqdm_translate(inpt_dict["verbose"])
@@ -39,6 +39,17 @@ def box(segments, inpt_dict):
     oneD_spec = np.empty((segments.data.shape[0],segments.data.shape[2])) # it has shape nints x ncols
     oneD_err = np.empty((segments.data.shape[0],segments.data.shape[2])) # same shape as oneD_spec
     wav_sols = np.empty((segments.data.shape[0],segments.data.shape[2])) # same shape as oneD_spec
+
+    # Build profile, if applicable.
+    profiles = np.ones_like(segments.data.values) # neutral weights, if not optimizing.
+    if inpt_dict["extract_method"] == "optimum":
+        # Now we have to actually build real profiles.
+        if inpt_dict["aperture_type"] == "median":
+            profile = optimum_median(segments)
+        for i in tqdm(range(profiles.shape[0]),
+                      desc='Building optimum profiles for each frame...',
+                      disable=(not time_ints)):
+            profiles[i,:,:] = profile
 
     # And populate.
     for i in tqdm(range(oneD_spec.shape[0]),
@@ -82,6 +93,25 @@ def box(segments, inpt_dict):
         w = np.ma.masked_array(w, mask=mask)
         wav_sols[i,:] = np.ma.median(w,axis=0)
 
+        # If we are doing optimum, we must revise our extraction.
+        if inpt_dict["extract_method"] == "optimum":
+            # Need to revise the variance estimates using the standard box spectrum.
+            variance = e**2 - d
+            variance[variance<=0] = 1e-10
+            standard_spectrum = oneD_spec[i,:]
+            revised_variance = variance+np.abs(standard_spectrum[np.newaxis,:]*profiles[i,:,:])
+
+            # Then weight the data and errors.
+            optimized_data = (profile*d/revised_variance)/np.sum(profiles[i,:,:]**2 / revised_variance, axis=0)
+            optimized_errors = (profile*e/revised_variance)/np.sum(profiles[i,:,:]**2 / revised_variance, axis=0)
+
+            # Now revise oneD_spec and err.
+            d = np.ma.masked_array(optimized_data, mask=mask)
+            oneD_spec[i,:] = np.ma.sum(d,axis=0)
+
+            e = np.ma.masked_array(optimized_errors, mask=mask)
+            oneD_err[i,:] = np.sqrt(np.ma.sum(np.square(e),axis=0))
+
         if (plot_step or save_step) and i==0:
             plt.imshow(mask)
             plt.title('1D extraction mask')
@@ -100,6 +130,16 @@ def box(segments, inpt_dict):
             if plot_step:
                 plt.show(block=True)
             plt.close()
+
+            if inpt_dict["extract_method"] == "optimum":
+                plt.imshow(mask, vmin=0, vmax=1)
+                plt.title('1D extraction optimum profile')
+                if save_step:
+                    plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_profile_frame0.png'),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show(block=True)
+                plt.close()
 
         if (plot_ints or save_ints):
             plt.imshow(mask)
@@ -120,24 +160,36 @@ def box(segments, inpt_dict):
                 plt.show(block=True)
             plt.close()
 
+            if inpt_dict["extract_method"] == "optimum":
+                plt.imshow(mask, vmin=0, vmax=1)
+                plt.title('1D extraction optimum profile')
+                if save_step:
+                    plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_profile_frame{}.png'.format(i)),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show(block=True)
+                plt.close()
+
     # Report time, if asked.
     if time_step:
         timer(time.time()-t0,None,None,None)
     
     return oneD_spec, oneD_err, wav_sols
 
-def optimum(segments, inpt_dict):
-    """Extracts 1D spectra using the methods of Horne 1986.
+def optimum_median(segments):
+    """Builds the spatial optimum profile using the median data frame.
 
     Args:
         segments (xarray): its data DataSet contains the integrations to
-        sum across, and its wavelengths DataSet can be used to limit the
-        1D extraction to a certain wavelength range.
-        inpt_dict (dict): instructions for running this step.
+        build the profile with.
 
     Returns:
-        _type_: _description_
+        np.array: the profiles array.
     """
-    # Placeholder!
-    oneD_spec, oneD_err, wav_sols = [], [], []
-    return oneD_spec, oneD_err, wav_sols
+    # Take the median of the segments on time.
+    median_frame = np.median(segments.data.values, axis=0)
+    # Force positivity.
+    median_frame[median_frame < 0] = 0
+    # And normalize.
+    median_frame = median_frame/np.sum(median_frame, axis=0)
+    return median_frame
