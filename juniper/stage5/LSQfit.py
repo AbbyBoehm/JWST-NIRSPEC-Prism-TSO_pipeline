@@ -4,6 +4,9 @@ from tqdm import tqdm
 import numpy as np
 from scipy.optimize import minimize
 
+import matplotlib.pyplot as plt
+from juniper.stage5 import models
+
 from juniper.stage5 import batman_handler, fit_handler, exotic_handler
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
 from juniper.util.cleaning import median_timeseries_filter

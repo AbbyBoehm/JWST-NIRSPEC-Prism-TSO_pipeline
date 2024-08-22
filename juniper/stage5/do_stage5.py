@@ -191,43 +191,49 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
                     continue
 
                 # First, LSQ.
-                if steps["use_LSQ"]:
+                try:
+                    if steps["use_LSQ"]:
+                        if steps["verbose"] == 2:
+                            print("Linear least squares fitting to single spectroscopic light curve..")
+                        planets, flares, systematics, LD = LSQfit.lsqfit_one(lc_time=time,
+                                                                            light_curve=light_curve,
+                                                                            errors=errors,
+                                                                            waves=waves,
+                                                                            planets=planets,flares=flares,
+                                                                            systematics=systematics,LD=LD,
+                                                                            inpt_dict=steps,
+                                                                            is_spec=True)
+                        # Save output.
+                        planets_err, flares_err, systematics_err, LD_err = planets, flares, systematics, LD
+                        save_s5_output(planets, planets_err, flares, flares_err,
+                                    systematics, systematics_err, LD, LD_err,
+                                    time, light_curve,
+                                    outfile+"_spec{}LSQ".format(wavestr), outdir)
+                except:
                     if steps["verbose"] == 2:
-                        print("Linear least squares fitting to single spectroscopic light curve..")
-                    planets, flares, systematics, LD = LSQfit.lsqfit_one(lc_time=time,
-                                                                         light_curve=light_curve,
-                                                                         errors=errors,
-                                                                         waves=waves,
-                                                                         planets=planets,flares=flares,
-                                                                         systematics=systematics,LD=LD,
-                                                                         inpt_dict=steps,
-                                                                         is_spec=True)
-                    # Save output.
-                    planets_err, flares_err, systematics_err, LD_err = planets, flares, systematics, LD
-                    save_s5_output(planets, planets_err, flares, flares_err,
-                                   systematics, systematics_err, LD, LD_err,
-                                   time, light_curve,
-                                   outfile+"_spec{}LSQ".format(wavestr), outdir)
-                    
+                        print("Linear least squares fitting failed, likely due to batman convergence failure.")
                 # Then MCMC.
-                if steps["use_MCMC"]:
-                    if steps["verbose"] == 2:
-                        print("Markov Chain Monte Carlo fitting to single spectroscopic light curve..")
-                    planets, flares, systematics, LD, p_err, f_err, s_err, L_err = MCMCfit.mcmcfit_one(lc_time=time,
-                                                                                                       light_curve=light_curve,
-                                                                                                       errors=errors,
-                                                                                                       waves=waves,
-                                                                                                       planets=planets,flares=flares,
-                                                                                                       systematics=systematics,LD=LD,
-                                                                                                       inpt_dict=steps,
-                                                                                                       is_spec=True)
-            
-                    # Save output.
-                    save_s5_output(planets, p_err, flares, f_err,
-                                   systematics, s_err, LD, L_err,
-                                   time, light_curve,
-                                   outfile+"_spec{}MCMC".format(wavestr), outdir)
+                try:
+                    if steps["use_MCMC"]:
+                        if steps["verbose"] == 2:
+                            print("Markov Chain Monte Carlo fitting to single spectroscopic light curve...")
+                        planets, flares, systematics, LD, p_err, f_err, s_err, L_err = MCMCfit.mcmcfit_one(lc_time=time,
+                                                                                                            light_curve=light_curve,
+                                                                                                            errors=errors,
+                                                                                                            waves=waves,
+                                                                                                            planets=planets,flares=flares,
+                                                                                                            systematics=systematics,LD=LD,
+                                                                                                            inpt_dict=steps,
+                                                                                                            is_spec=True)
                 
+                        # Save output.
+                        save_s5_output(planets, p_err, flares, f_err,
+                                        systematics, s_err, LD, L_err,
+                                        time, light_curve,
+                                        outfile+"_spec{}MCMC".format(wavestr), outdir)
+                except:
+                    if steps["verbose"] == 2:
+                        print("Markov Chain Monte Carlo fititng failed, likely due to batman convergence failure.")
                 # Reset planets, etc. to originals.
                 planets, flares, systematics, LD = planets0, flares0, systematics0, LD0
 

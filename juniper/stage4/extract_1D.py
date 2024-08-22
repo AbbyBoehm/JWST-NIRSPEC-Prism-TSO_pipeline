@@ -122,17 +122,8 @@ def extract(segments, inpt_dict):
                 plt.show(block=True)
             plt.close()
 
-            plt.plot(wav_sols[i,:],oneD_spec[i,:],color='darkblue')
-            plt.title('1D spectrum')
-            if save_step:
-                plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_spectrum_frame0.png'),
-                            dpi=300, bbox_inches='tight')
-            if plot_step:
-                plt.show(block=True)
-            plt.close()
-
             if inpt_dict["extract_method"] == "optimum":
-                plt.imshow(mask, vmin=0, vmax=1)
+                plt.imshow(profiles[i,:,:], vmin=0, vmax=1)
                 plt.title('1D extraction optimum profile')
                 if save_step:
                     plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_profile_frame0.png'),
@@ -151,6 +142,36 @@ def extract(segments, inpt_dict):
                 plt.show(block=True)
             plt.close()
 
+            if inpt_dict["extract_method"] == "optimum":
+                plt.imshow(profiles[i,:,:], vmin=0, vmax=1)
+                plt.title('1D extraction optimum profile')
+                if save_step:
+                    plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_profile_frame{}.png'.format(i)),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show(block=True)
+                plt.close()
+
+    # Delete any wavelength indices that have wavelength 0.
+    wav_ref = wav_sols[0,:] # all wav sols should be same
+    bad_indices = np.argwhere(wav_ref == 0)
+    oneD_spec = np.delete(oneD_spec, bad_indices, axis=1)
+    oneD_err = np.delete(oneD_err, bad_indices, axis=1)
+    wav_sols = np.delete(wav_sols, bad_indices, axis=1)
+
+    if (plot_step or save_step):
+        i = 0
+        plt.plot(wav_sols[i,:],oneD_spec[i,:],color='darkblue')
+        plt.title('1D spectrum')
+        if save_step:
+            plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_spectrum_frame{}.png'.format(i)),
+                        dpi=300, bbox_inches='tight')
+        if plot_step:
+            plt.show(block=True)
+        plt.close()
+
+    if (plot_ints or save_ints):
+        for i in range(oneD_spec.shape[0]):
             plt.plot(wav_sols[i,:],oneD_spec[i,:],color='darkblue')
             plt.title('1D spectrum')
             if save_step:
@@ -159,16 +180,6 @@ def extract(segments, inpt_dict):
             if plot_step:
                 plt.show(block=True)
             plt.close()
-
-            if inpt_dict["extract_method"] == "optimum":
-                plt.imshow(mask, vmin=0, vmax=1)
-                plt.title('1D extraction optimum profile')
-                if save_step:
-                    plt.savefig(os.path.join(inpt_dict['plot_dir'],'S4_1D_extraction_profile_frame{}.png'.format(i)),
-                                dpi=300, bbox_inches='tight')
-                if plot_step:
-                    plt.show(block=True)
-                plt.close()
 
     # Report time, if asked.
     if time_step:
@@ -187,9 +198,9 @@ def optimum_median(segments):
         np.array: the profiles array.
     """
     # Take the median of the segments on time.
-    median_frame = np.median(segments.data.values, axis=0)
+    median_frame = np.nanmedian(segments.data.values, axis=0)
     # Force positivity.
     median_frame[median_frame < 0] = 0
     # And normalize.
-    median_frame = median_frame/np.sum(median_frame, axis=0)
+    median_frame = median_frame/np.nansum(median_frame, axis=0)
     return median_frame

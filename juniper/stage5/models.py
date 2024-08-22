@@ -48,7 +48,7 @@ def full_model(t, planets, flares, systematics, params_to_fit=None, fit_param_ke
     # Build flare flux.
     for flare_ID in list(flares.keys()):
         flare = flares[flare_ID] # dict, contains flare parameters
-        flare_flux = flare_model(t, flare)
+        flare_flux = flare_model(t, flare, str.replace(flare_ID,"flare",""))
         # Multiply flare's flux contribution into the full model.
         flx *= flare_flux
         models[flare_ID] = flare_flux
@@ -186,21 +186,22 @@ def systematic_psf(widths, coeffs):
     psf = 1 + coeffs[0]*widths
     return psf
 
-def flare_model(t, flare):
+def flare_model(t, flare, flare_ID):
     """Model of a flare from Tovar Mendoza+ 2022
 
     Args:
         t (np.array): time.
         flare (dict): description of this flare, including its start time,
         amplitude, and fade time.
+        flare_ID (str): the number of the flare. Used for picking the right keys.
 
     Returns:
         np.array: flux of a flare with time.
     """
-    t_offset = np.array([ti - flare["E"] for ti in t])
-    c1 = np.sqrt(np.pi)*flare["A"]*flare["C"]/2
-    c2 = flare["Fr"]*flare_h(t_offset, flare["B"], flare["C"], flare["Dr"])
-    c3 = (1-flare["Fr"])*flare_h(t_offset, flare["B"], flare["C"], flare["Ds"])
+    t_offset = np.array([ti - flare["E"+flare_ID] for ti in t])
+    c1 = np.sqrt(np.pi)*flare["A"+flare_ID]*flare["C"+flare_ID]/2
+    c2 = flare["Fr"+flare_ID]*flare_h(t_offset, flare["B"+flare_ID], flare["C"+flare_ID], flare["Dr"+flare_ID])
+    c3 = (1-flare["Fr"+flare_ID])*flare_h(t_offset, flare["B"+flare_ID], flare["C"+flare_ID], flare["Ds"+flare_ID])
     return c1*(c2+c3)
 
 def flare_h(t, B, C, D):

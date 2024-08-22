@@ -217,6 +217,74 @@ def bin_light_curves(spectra, inpt_dict):
         specwave.append(specwave_det)
         specbins.append(specbins_det)
 
+    # Need these in case you don't want to bin in time.
+    xpos = spectra.xpos.values
+    ypos = spectra.ypos.values
+    widths = spectra.widths.values
+    t = spectra.time.values
+
+    # If asked, bin in time.
+    if inpt_dict["bin_time"]:
+        if inpt_dict["verbose"] >= 1:
+            print("Binning light curves down in time...")
+            
+        # Get the bin size once.
+        s = inpt_dict["bin_size"]
+
+        # Start by binning time itself.
+        t_new = []
+        for d in range(t.shape[0]):
+            t_new.append(time_bin(t[d,:],s,'median'))
+
+        t = np.array(t_new)
+
+        # We can initialize a lot of empty arrays this way.
+        broadband_new = np.empty_like(t)
+        broaderr_new = np.empty_like(t)
+        xpos_new = np.empty_like(t)
+        ypos_new = np.empty_like(t)
+        widths_new = np.empty_like(t)
+
+        for d in range(t.shape[0]):
+            broadband_new[d,:] = time_bin(broadband[d],s,'mean')
+            broaderr_new[d,:] = time_bin(broaderr[d],s,'quadrature')
+            xpos_new[d,:] = time_bin(xpos[d],s,'median')
+            ypos_new[d,:] = time_bin(ypos[d],s,'median')
+            widths_new[d,:] = time_bin(widths[d],s,'median')
+
+        broadband = broadband_new
+        broaderr = broaderr_new
+        xpos = xpos_new
+        ypos = ypos_new
+        widths = widths_new
+
+        # The spec and spec_err need slightly special treatment.
+        spec_new = np.empty((t.shape[0],len(spec[0]),t.shape[1]))
+        specerr_new = np.empty((t.shape[0],len(specerr[0]),t.shape[1]))
+
+        for d in range(t.shape[0]):
+            for l in range(spec_new.shape[1]):
+                spec_new[d,l,:] = time_bin(spec[d][l],s,'mean')
+                specerr_new[d,l,:] = time_bin(specerr[d][l],s,'quadrature')
+
+        spec = spec_new
+        specerr = specerr_new
+
+        if (plot_step or save_step):
+            # Create diagnostic plot of the binned broad-band light curve.
+            for d in range(t.shape[0]):
+                plt.errorbar(t[d,:], broadband[d,:], yerr=broaderr[d,:], fmt='ko', capsize=3)
+                plt.title("Broad-band light curve")
+                plt.xlabel("time [mjd]")
+                plt.ylabel("flux [a.u.]")
+                if save_step:
+                    plt.savefig(os.path.join(inpt_dict['plot_dir'],'S5_detector{}_binnedbroadband_lc.png'.format(d)),
+                                dpi=300, bbox_inches='tight')
+                if plot_ints:
+                    plt.show(block=True)
+                plt.close()
+
+
     # Now create an xarray out of this info.
     light_curves = xr.Dataset(data_vars=dict(
                                     broadband=(["detector", "time"], broadband),
@@ -227,12 +295,12 @@ def bin_light_curves(spectra, inpt_dict):
                                     specerr=(["detector", "wavelength", "time"], specerr),
                                     specwave=(["detector", "wavelength"],specwave),
                                     specbins=(["detector", "wavelength", "edge"],specbins),
-                                    xpos=(["detector", "time"],spectra.xpos.values),
-                                    ypos=(["detector", "time"],spectra.ypos.values),
-                                    widths=(["detector", "time"],spectra.widths.values),
+                                    xpos=(["detector", "time"],xpos),
+                                    ypos=(["detector", "time"],ypos),
+                                    widths=(["detector", "time"],widths),
                                     ),
                         coords=dict(
-                               time = (["detector", "time"], spectra.time.values),
+                               time = (["detector", "time"], t),
                                detectors = (["detector",], [i for i in range(spectra.spectrum.shape[0])]),
                                details = (["detector","observation_mode"], spectra.details.values), # this has the form Ndetectors x [[INSTRUMENT, DETECTOR, FILTER, GRATING]]
                                ),
@@ -244,3 +312,51 @@ def bin_light_curves(spectra, inpt_dict):
     if time_step:
         timer(time.time()-t0,None,None,None)
     return light_curves
+
+def time_bin(array, bin_size, mode='sum'):
+    """Simple function to bin an array down in size.
+
+    Args:
+        array (np.array): the array to bin down.
+        bin_size (int): how many items should go into the bin.
+        mode (str, optional): how to combine the values. Options are 'sum',
+        'mean', 'median', or 'quadrature'. Defaults to 'sum'.
+    
+    Returns:
+        np.array: the input array reduced in size.
+    """
+    # Initialize new array as list.
+    binned = []
+
+    # Ensure no overflow.
+    if bin_size > array.shape[0]:
+        bin_size = array.shape[0] - 1
+
+    # Then, iterate.
+    ind = 0
+    while ind+bin_size < array.shape[0]:
+        trim = array[ind:ind+bin_size]
+        if mode == 'sum':
+            binned.append(np.ma.sum(trim))
+        if mode == 'mean':
+            binned.append(np.ma.mean(trim))
+        if mode == 'median':
+            binned.append(np.ma.median(trim))
+        if mode == 'quadrature':
+            binned.append(np.sqrt(np.ma.sum(np.square(trim)))/len(trim))
+        ind += bin_size
+    
+    trim = array[ind:]
+    if len(trim) == 0:
+        pass
+    else:
+        if mode == 'sum':
+            binned.append(np.ma.sum(trim))
+        if mode == 'mean':
+            binned.append(np.ma.mean(trim))
+        if mode == 'median':
+            binned.append(np.ma.median(trim))
+        if mode == 'quadrature':
+            binned.append(np.sqrt(np.ma.sum(np.square(trim)))/len(trim))
+    
+    return binned

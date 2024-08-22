@@ -54,10 +54,11 @@ def colbycol_bckg(data, bckg_rows=[], trace_mask=None):
         np.array: data array with column-by-column noise removed, and background of that noise.
     """
     # Define the background region using background rows and/or masks, if applicable.
+    trace_mask[np.isnan(data)] = 1
     background_region = np.ma.masked_array(data,mask=trace_mask)
     if bckg_rows:
          background_region = background_region[bckg_rows, :]
-            
+
     # Define the median background in each column and extend to a full-size array.
     background = np.ma.median(background_region, axis=0)
     background = np.array([background,]*data.shape[0])
