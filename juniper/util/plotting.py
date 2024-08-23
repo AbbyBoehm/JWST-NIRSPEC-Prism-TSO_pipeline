@@ -1,3 +1,6 @@
+import numpy as np
+
+import corner
 import matplotlib.pyplot as plt
 from matplotlib.scale import get_scale_names
 
@@ -62,3 +65,37 @@ def plot_res(ax, t, res, lc_err):
 
     ax.axhline(y=0,color='red',ls='--')
     return ax
+
+def plot_corner(flat_samples, labels):
+    fig = corner.corner(flat_samples, labels=labels)
+    return fig
+
+def plot_chains(ndim, samples, labels):
+    fig, axes = plt.subplots(ndim, figsize=(10, 7), sharex=True)
+    for i in range(ndim):
+        try:
+            ax = axes[i]
+        except TypeError:
+            # There is only one axis because there was only one sample.
+            ax = axes
+        ax.plot(samples[:, :, i], "k", alpha=0.3)
+        ax.set_xlim(0, len(samples))
+        ax.set_ylabel(labels[i])
+        ax.yaxis.set_label_coords(-0.1, 0.5)
+    
+    ax.set_xlabel("step number") # will automatically grab last used axis
+    return fig, axes
+
+def plot_post(ndim, samples, labels, n):
+    fig, axes = plt.subplots(ndim, figsize=(10, 7), sharex=False)
+    for i in range(ndim):
+        try:
+            ax = axes[i]
+        except TypeError:
+            # There is only one axis because there was only one sample.
+            ax = axes
+        post = np.reshape(samples[:, :, i], (n))
+        ax.hist(post, 100, alpha=0.3)
+        ax.set_xlim(min(post), max(post))
+        ax.set_ylabel(labels[i])
+    return fig, axes

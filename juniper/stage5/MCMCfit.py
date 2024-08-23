@@ -1,8 +1,10 @@
+import os
 import time
 from tqdm import tqdm
 
 import numpy as np
 import emcee
+import matplotlib.pyplot as plt
 
 from juniper.stage5 import batman_handler, fit_handler, exotic_handler
 from juniper.util.diagnostics import tqdm_translate, plot_translate, timer
@@ -121,6 +123,9 @@ def mcmcfit_one(lc_time, light_curve, errors, waves, planets, flares, systematic
     n = np.shape(samples[:,:,0])[0]*np.shape(samples[:,:,0])[1]
     labels = [key for key in fit_param_keys]
 
+    # Store plotting items, we may want them later.
+    plotting_items = (ndim, samples, flat_samples, labels, n)
+
     # Turn the flattened chains into arrays.
     fitted_array, fitted_errs_array = fit_handler.get_result_from_post(ndim, flat_samples)
     
@@ -156,6 +161,6 @@ def mcmcfit_one(lc_time, light_curve, errors, waves, planets, flares, systematic
     # Re-initialize the planets.
     planets = batman_handler.batman_init_all_planets(lc_time, planets, LD,
                                                      event=inpt_dict["event_type"])
-    
+
     # And return the fitted parameters.
-    return planets, flares, systematics, LD, planets_e, flares_e, systematics_e, LD_e
+    return planets, flares, systematics, LD, planets_e, flares_e, systematics_e, LD_e, plotting_items

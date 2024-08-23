@@ -4,10 +4,12 @@ from tqdm import tqdm
 
 import numpy as np
 import xarray as xr
+import matplotlib.pyplot as plt
 
 from juniper.config.translate_config import make_planets, make_flares, make_systematics, make_LD
 from juniper.util.diagnostics import tqdm_translate, plot_translate
 from juniper.util.datahandling import stitch_spectra, save_s5_output
+from juniper.util.plotting import plot_chains, plot_corner, plot_post
 from juniper.stage5 import bin_light_curves, LSQfit, MCMCfit
 
 def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
@@ -112,19 +114,51 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
         if steps["use_MCMC"] and len(light_curves.detectors.values)==1:
             if steps["verbose"] == 2:
                 print("Markov Chain Monte Carlo fitting to a single broadband curve...")
-            planets, flares, systematics, LD, p_err, f_err, s_err, L_err = MCMCfit.mcmcfit_one(lc_time=light_curves.time.values[0,:],
-                                                                                               light_curve=light_curves.broadband.values[0,:],
-                                                                                               errors=light_curves.broaderr.values[0,:],
-                                                                                               waves=light_curves.broadbins.values[0,:],
-                                                                                               planets=planets,flares=flares,
-                                                                                               systematics=systematics,LD=LD,
-                                                                                               inpt_dict=steps)
+            planets, flares, systematics, LD, p_err, f_err, s_err, L_err, plotting_items = MCMCfit.mcmcfit_one(lc_time=light_curves.time.values[0,:],
+                                                                                                               light_curve=light_curves.broadband.values[0,:],
+                                                                                                               errors=light_curves.broaderr.values[0,:],
+                                                                                                               waves=light_curves.broadbins.values[0,:],
+                                                                                                               planets=planets,flares=flares,
+                                                                                                               systematics=systematics,LD=LD,
+                                                                                                               inpt_dict=steps)
             
             # Save output.
             save_s5_output(planets, p_err, flares, f_err,
                            systematics, s_err, LD, L_err,
                            light_curves.time.values[:,:], light_curves.broadband.values[:,:],
                            outfile+"_broadbandMCMC", outdir)
+            
+            # Plot, if asked.
+            if (plot_step or save_step):
+                # Unpack plotting items.
+                ndim, samples, flat_samples, labels, n = plotting_items
+                labels = [str.replace(a, "_prior", "") for a in labels] # clip off the prior tag
+                # Plot posteriors.
+                fig, ax = plot_post(ndim,samples,labels,n)
+                if save_step:
+                    plt.savefig(os.path.join(plot_dir,"s5_"+outfile+"_broadbandMCMC-posterior.png"),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show(block=True)
+                plt.close()
+
+                # Plot corners.
+                fig = plot_corner(flat_samples,labels)
+                if save_step:
+                    plt.savefig(os.path.join(plot_dir,"s5_"+outfile+"_broadbandMCMC-corner.png"),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show(block=True)
+                plt.close()
+
+                # Plot chains.
+                fig, ax = plot_chains(ndim,samples,labels)
+                if save_step:
+                    plt.savefig(os.path.join(plot_dir,"s5_"+outfile+"_broadbandMCMC-chains.png"),
+                                dpi=300, bbox_inches='tight')
+                if plot_step:
+                    plt.show(block=True)
+                plt.close()
         
         else:
             if steps["verbose"] == 2:
@@ -217,20 +251,54 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
                     if steps["use_MCMC"]:
                         if steps["verbose"] == 2:
                             print("Markov Chain Monte Carlo fitting to single spectroscopic light curve...")
-                        planets, flares, systematics, LD, p_err, f_err, s_err, L_err = MCMCfit.mcmcfit_one(lc_time=time,
-                                                                                                            light_curve=light_curve,
-                                                                                                            errors=errors,
-                                                                                                            waves=waves,
-                                                                                                            planets=planets,flares=flares,
-                                                                                                            systematics=systematics,LD=LD,
-                                                                                                            inpt_dict=steps,
-                                                                                                            is_spec=True)
+                        planets, flares, systematics, LD, p_err, f_err, s_err, L_err, plotting_items = MCMCfit.mcmcfit_one(lc_time=time,
+                                                                                                                           light_curve=light_curve,
+                                                                                                                           errors=errors,
+                                                                                                                           waves=waves,
+                                                                                                                           planets=planets,flares=flares,
+                                                                                                                           systematics=systematics,LD=LD,
+                                                                                                                           inpt_dict=steps,
+                                                                                                                           is_spec=True)
                 
                         # Save output.
                         save_s5_output(planets, p_err, flares, f_err,
                                         systematics, s_err, LD, L_err,
                                         time, light_curve,
                                         outfile+"_spec{}MCMC".format(wavestr), outdir)
+                        
+                        # Plot, if asked.
+                        if (plot_ints or save_ints):
+                            # Unpack plotting items.
+                            ndim, samples, flat_samples, labels, n = plotting_items
+                            labels = [str.replace(a, "_prior", "") for a in labels] # clip off the prior tag
+                            # Plot posteriors.
+                            fig, ax = plot_post(ndim,samples,labels,n)
+                            if save_ints:
+                                plt.savefig(os.path.join(plot_dir,"s5_"+outfile+"_spec{}MCMC-posterior.png".format(wavestr)),
+                                            dpi=300, bbox_inches='tight')
+                            if plot_ints:
+                                plt.show(block=True)
+                            plt.close()
+
+                            # Plot corners.
+                            fig = plot_corner(flat_samples,labels)
+                            if save_ints:
+                                plt.savefig(os.path.join(plot_dir,"s5_"+outfile+"_spec{}MCMC-corner.png".format(wavestr)),
+                                            dpi=300, bbox_inches='tight')
+                            if plot_ints:
+                                plt.show(block=True)
+                            plt.close()
+
+                            # Plot chains.
+                            fig, ax = plot_chains(ndim,samples,labels)
+                            if save_step:
+                                plt.savefig(os.path.join(plot_dir,"s5_"+outfile+"_spec{}MCMC-chains.png".format(wavestr)),
+                                            dpi=300, bbox_inches='tight')
+                            if plot_step:
+                                plt.show(block=True)
+                            plt.close()
+
+
                 except:
                     if steps["verbose"] == 2:
                         print("Markov Chain Monte Carlo fititng failed, likely due to batman convergence failure.")
