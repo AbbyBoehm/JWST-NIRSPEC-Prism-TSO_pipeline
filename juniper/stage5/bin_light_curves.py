@@ -139,7 +139,7 @@ def bin_light_curves(spectra, inpt_dict):
             if save_step:
                 plt.savefig(os.path.join(inpt_dict['plot_dir'],'S5_detector{}_broadband_lc.png'.format(d)),
                             dpi=300, bbox_inches='tight')
-            if plot_ints:
+            if plot_step:
                 plt.show(block=True)
             plt.close()
 
@@ -161,12 +161,35 @@ def bin_light_curves(spectra, inpt_dict):
                 bin_err = np.ma.sqrt(np.ma.sum(np.square(error[:,l:r]),axis=1))
                 bin_wave = np.ma.median(waves[l:r])
                 bin_bins = np.array([np.ma.min(waves[l:r]),np.ma.max(waves[l:r])])
+                if bin_bins[0] == bin_bins[1]:
+                    # Should only happen if len(wavs[l:r]) == 1.
+                    try:
+                        next_wave = np.ma.median(waves[r:r+n_columns])
+                        hw = (next_wave-bin_wave)/2
+                        bin_bins=np.array([bin_wave-hw,bin_wave+hw])
+                    except:
+                        last_wave = specwave_det[-1]
+                        hw = (bin_wave-last_wave)/2
+                        bin_bins=np.array([bin_wave-hw,bin_wave+hw])
         
                 # Store both the spectrum and each point's uncertainty.
                 spec_det.append(bin_spec)
                 specerr_det.append(bin_err)
                 specwave_det.append(bin_wave)
                 specbins_det.append(bin_bins)
+
+                if (plot_ints or save_ints):
+                    # Create diagnostic plot of this spec light curve.
+                    plt.errorbar(spectra.time.values[d,:], bin_spec, yerr=bin_err, fmt='ko', capsize=3)
+                    plt.title("Spectroscopic light curve")
+                    plt.xlabel("time [mjd]")
+                    plt.ylabel("flux [a.u.]")
+                    if save_ints:
+                        plt.savefig(os.path.join(inpt_dict['plot_dir'],'S5_detector{}_spec{}um_lc.png'.format(d,np.round(bin_wave,3))),
+                                    dpi=300, bbox_inches='tight')
+                    if plot_ints:
+                        plt.show(block=True)
+                    plt.close()
 
                 # Progress bar update.
                 pbar.update(1)
@@ -179,12 +202,29 @@ def bin_light_curves(spectra, inpt_dict):
             bin_err = np.ma.sqrt(np.ma.sum(np.square(error[:,l:]),axis=1))
             bin_wave = np.ma.median(waves[l:])
             bin_bins = np.array([np.ma.min(waves[l:]),np.ma.max(waves[l:])])
+            if bin_bins[0] == bin_bins[1]:
+                last_wave = specwave_det[-1]
+                hw = (bin_wave-last_wave)/2
+                bin_bins=np.array([bin_wave-hw,bin_wave+hw])
     
             # Store both the spectrum and each point's uncertainty.
             spec_det.append(bin_spec)
             specerr_det.append(bin_err)
             specwave_det.append(bin_wave)
             specbins_det.append(bin_bins)
+
+            if (plot_ints or save_ints):
+                # Create diagnostic plot of this spec light curve.
+                plt.errorbar(spectra.time.values[d,:], bin_spec, yerr=bin_err, fmt='ko', capsize=3)
+                plt.title("Spectroscopic light curve")
+                plt.xlabel("time [mjd]")
+                plt.ylabel("flux [a.u.]")
+                if save_ints:
+                    plt.savefig(os.path.join(inpt_dict['plot_dir'],'S5_detector{}_spec{}um_lc.png'.format(d,np.round(bin_wave,3))),
+                                dpi=300, bbox_inches='tight')
+                if plot_ints:
+                    plt.show(block=True)
+                plt.close()
 
             # Close the progress bar.
             pbar.close()
@@ -204,12 +244,36 @@ def bin_light_curves(spectra, inpt_dict):
                 bin_err = np.ma.sqrt(np.ma.sum(np.square(error[:,wave_bin]),axis=1))
                 bin_wave = np.ma.median(waves[wave_bin])
                 bin_bins = np.array([np.ma.min(waves[wave_bin]),np.ma.max(waves[wave_bin])])
+                if bin_bins[0] == bin_bins[1]:
+                    # Should only happen if len(wavs[l:r]) == 1.
+                    try:
+                        next_wave_bin = np.argwhere((waves >= wave_bins[i] and waves <= wave_bins[i+1]))
+                        next_wave = np.ma.median(waves[next_wave_bin])
+                        hw = (next_wave-bin_wave)/2
+                        bin_bins=np.array([bin_wave-hw,bin_wave+hw])
+                    except:
+                        last_wave = specwave_det[-1]
+                        hw = (bin_wave-last_wave)/2
+                        bin_bins=np.array([bin_wave-hw,bin_wave+hw])
         
                 # Store both the spectrum and each point's uncertainty.
                 spec_det.append(bin_spec)
                 specerr_det.append(bin_err)
                 specwave_det.append(bin_wave)
                 specbins_det.append(bin_bins)
+
+                if (plot_ints or save_ints):
+                    # Create diagnostic plot of this spec light curve.
+                    plt.errorbar(spectra.time.values[d,:], bin_spec, yerr=bin_err, fmt='ko', capsize=3)
+                    plt.title("Spectroscopic light curve")
+                    plt.xlabel("time [mjd]")
+                    plt.ylabel("flux [a.u.]")
+                    if save_ints:
+                        plt.savefig(os.path.join(inpt_dict['plot_dir'],'S5_detector{}_spec{}um_lc.png'.format(d,np.round(bin_wave,3))),
+                                    dpi=300, bbox_inches='tight')
+                    if plot_ints:
+                        plt.show(block=True)
+                    plt.close()
 
         # And store.
         spec.append(spec_det)
@@ -280,7 +344,7 @@ def bin_light_curves(spectra, inpt_dict):
                 if save_step:
                     plt.savefig(os.path.join(inpt_dict['plot_dir'],'S5_detector{}_binnedbroadband_lc.png'.format(d)),
                                 dpi=300, bbox_inches='tight')
-                if plot_ints:
+                if plot_step:
                     plt.show(block=True)
                 plt.close()
 
