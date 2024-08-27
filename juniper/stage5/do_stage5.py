@@ -88,7 +88,7 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
             planets_err, flares_err, systematics_err, LD_err = planets, flares, systematics, LD
             save_s5_output(planets, planets_err, flares, flares_err,
                             systematics, systematics_err, LD, LD_err,
-                            light_curves.time.values[:,:], light_curves.broadband.values[:,:],
+                            light_curves.time.values[:,:], light_curves.broadband.values[:,:],light_curves.broaderr.values[0,:],'broadband',
                             outfile+"_broadbandLSQ", outdir)
 
         elif steps["use_LSQ"] and len(light_curves.detectors.values)!=1:
@@ -105,7 +105,7 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
             planets_err, flares_err, systematics_err, LD_err = planets, flares, systematics, LD
             save_s5_output(planets, planets_err, flares, flares_err,
                            systematics, systematics_err, LD, LD_err,
-                           light_curves.time.values[:,:], light_curves.broadband.values[:,:],
+                           light_curves.time.values[:,:], light_curves.broadband.values[:,:],light_curves.broaderr.values[:,:],'broadband',
                            outfile+"_broadbandLSQ", outdir)
         
 
@@ -125,7 +125,7 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
             # Save output.
             save_s5_output(planets, p_err, flares, f_err,
                            systematics, s_err, LD, L_err,
-                           light_curves.time.values[:,:], light_curves.broadband.values[:,:],
+                           light_curves.time.values[:,:], light_curves.broadband.values[:,:], light_curves.broaderr.values[0,:], 'broadband',
                            outfile+"_broadbandMCMC", outdir)
             
             # Plot, if asked.
@@ -174,7 +174,7 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
             # Save output.
             save_s5_output(planets, p_err, flares, f_err,
                             systematics, s_err, LD, L_err,
-                            light_curves.time.values[0,:], light_curves.broadband.values[0,:],
+                            light_curves.time.values[0,:], light_curves.broadband.values[0,:], light_curves.broaderr.values[0,:], 'broadband',
                             outfile+"_broadbandMCMC", outdir)
             '''
     
@@ -241,7 +241,7 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
                         planets_err, flares_err, systematics_err, LD_err = planets, flares, systematics, LD
                         save_s5_output(planets, planets_err, flares, flares_err,
                                     systematics, systematics_err, LD, LD_err,
-                                    time, light_curve,
+                                    time, light_curve, errors, wavestr,
                                     outfile+"_spec{}LSQ".format(wavestr), outdir)
                 except:
                     if steps["verbose"] == 2:
@@ -263,7 +263,7 @@ def do_stage5(filepaths, outfile, outdir, steps, plot_dir):
                         # Save output.
                         save_s5_output(planets, p_err, flares, f_err,
                                         systematics, s_err, LD, L_err,
-                                        time, light_curve,
+                                        time, light_curve, errors, wavestr,
                                         outfile+"_spec{}MCMC".format(wavestr), outdir)
                         
                         # Plot, if asked.

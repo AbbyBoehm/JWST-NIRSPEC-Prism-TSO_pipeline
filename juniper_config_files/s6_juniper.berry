@@ -1,0 +1,39 @@
+# Juniper config file for launching Stage 6: Results
+
+# Setup for Stage 6
+toplevel_dir    ''                                          # Top-level directory for all files in this project. The input and output files should be here.
+input           'fits'                                      # The sub-directory relative to the top-level directory where your input *.npy files are.
+output          'results'                                   # The sub-directory relative to the top-level directory where your output *.dat, *.txt, and *.png files will be saved.
+run_name        None                                        # str or None. You can use this to open sub-folders in the output folder if you wanted to rerun (e.g. have output/run1 and output/run2).
+CRDS_PATH       None                                        # str or None. If you already have a crds_cache directory, point to its absolute path here. Otherwise, a crds_cache will be opened in the current working directory.
+max_cores       'half'                                      # integer or 'quarter', 'half', 'all'. How many cores to use for multiprocessing.
+verbose         2                                           # Int from 0 to 2. 0 = print nothing. 1 = print some statements. 2 = print every action.
+show_plots      0                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
+save_plots      1                                           # Int from 0 to 2. 0 = save nothing. 1 = save some plots. 2 = save all plots.
+diagnostics     'results/diagnostics'                       # str. If save_plots >= 1, diagnostic plots will be written to this folder.
+rename          None                                        # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').
+
+# Step 1: Read in the LSQ and MCMC results.
+read_LSQ        True                                        # bool. If True, reads in the results from linear least squares fitting.
+read_MCMC       True                                        # bool. If True, reads in the results from Markov Chain Monte Carlo fitting.
+
+# Step 2: Plot fits and residuals
+plot_individual True                                        # bool. If True, individually plots the light curve, fitted model, and residuals for each wavelength bin.
+plot_bin        20                                          # int or None. If not None, plots a binned version of the light curve and residuals over the model. Bins by this many timestamps.
+
+plot_components True                                        # bool. If True, plots the individual model components (e.g. planet, poly, ramp, etc.) in tiles.
+comps_bin       20                                          # int or None. If not None, plots a binned version of the light curve and residuals over the model. Bins by this many timestamps.
+
+plot_waterfall  True                                        # bool. If True, plots the light curve, fitted model, and residuals for all models as a waterfall.
+waterfall_bin   20                                          # int or None. If not None, plots a binned version of the light curve and residuals over each model. Bins by this many timestamps.
+waterfall_space 500                                         # float. The spacing between each plot on the waterfall in ppm. Should be at least equal to the average expected depth.
+waterfall_cmap  'jet'                                       # str. Name of a colormap from Matplotlib. Used to colorize your waterfall.
+waterfall_wavs  [0.5,5.5]                                   # list of float. If not empty. defines these wavelengths as the minimum and maximum on your colormap.
+
+# Step 3: Get spectrum
+get_spectrum    True                                        # bool. If True, saves the transmission/emission spectrum computed from these fits as a .dat and a .txt.
+spectrum_type   'rprs2'                                     # str. Options are 'rprs' (planet radius/star radius), 'rprs2' (planet radius^2/star radius^2), 'aover' (planet area overlapping star area), or 'fpfs' (planet flux/star flux).
+bin_factors     []                                          # list of int. How many depth points you want to bin together. You can enter multiple ints to get many binned spectra. Can be empty to just leave it in native resolution.
+wave_bounds     []                                          # list. If not empty, the lower and upper limits of wavelength you want to view. Helpful if one part of your spectrum is small but detailed (i.e. the optical end of an eclipse spectrum can be like this).
+
+# ENDPARSE

@@ -447,8 +447,9 @@ def read_one_lc(file):
 
 def save_s5_output(planets, planets_err, flares, flares_err,
                    systematics, systematics_err, LD, LD_err,
-                   time, light_curve, outfile, outdir):
-    """Writes out the results of a fit to a pickle file.
+                   time, light_curve, errors, wavelength,
+                   outfile, outdir):
+    """Writes out the results of a fit to a .npy file.
 
     Args:
         planets (dict): every fitted planet.
@@ -461,6 +462,8 @@ def save_s5_output(planets, planets_err, flares, flares_err,
         LD_err (dict): uncertainties on limb darkening model.
         time (np.array): timestamps for each flux point.
         light_curve (np.array): flux at each point in time.
+        errors (np.array): uncertainty at each point in time.
+        wavelength (float): central wavelength for this data.
         outfile (str): name to give the saved file.
         outdir (str): where to save the file to.
     """
@@ -474,7 +477,9 @@ def save_s5_output(planets, planets_err, flares, flares_err,
               "LD":LD,
               "LD_err":LD_err,
               "time":time,
-              "light_curve":light_curve}
+              "light_curve":light_curve,
+              "errors":errors,
+              "wavelength":wavelength}
     
     filename = (os.path.join(outdir, '{}.npy'.format(outfile)))
     np.save(filename,output)
