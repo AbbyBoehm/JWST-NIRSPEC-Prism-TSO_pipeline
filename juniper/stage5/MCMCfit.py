@@ -1,6 +1,7 @@
 import os
 import time
 from tqdm import tqdm
+from multiprocessing import Pool, cpu_count
 
 import numpy as np
 import emcee
@@ -106,11 +107,30 @@ def mcmcfit_one(lc_time, light_curve, errors, waves, planets, flares, systematic
     else:
         # If it is a fraction, the user has asked to burn a fraction of the steps.
         discard = int(inpt_dict["MCMC_burnin"]*steps)
+
+    # Check for parallelization.
+    if inpt_dict["max_cores"] != 1:
+        # Count cores that are available.
+        cores = cpu_count()
+        if inpt_dict["max_cores"] in ('quarter','half','all'):
+            # Asked for a fraction of what's available, so get that fraction.
+            translate = {'quarter':0.25,'half':0.5,'all':1.0}
+            n_use = int(translate[inpt_dict["max_cores"]]*cores)
+        else:
+            # Specified a number of cores.
+            n_use = inpt_dict["max_cores"]
+        if n_use > cores:
+            # Don't use more cores than there are!
+            n_use = cores
+        pool = Pool(n_use)
+    else:
+        pool = None
     
     # Define the emcee sampler.
     sampler = emcee.EnsembleSampler(nwalkers, ndim, fit_handler.log_probability,
                                     args=(params_to_fit, fit_param_keys, lc_time, light_curve, errors,
-                                          params_priors, inpt_dict["priors_type"], xpos, ypos, widths),)
+                                          params_priors, inpt_dict["priors_type"], xpos, ypos, widths),
+                                    pool=pool)
     
     # And run it!
     sampler.run_mcmc(pos, steps, progress=True)#;
@@ -118,6 +138,11 @@ def mcmcfit_one(lc_time, light_curve, errors, waves, planets, flares, systematic
     # Pull the sampled posteriors and discard the burn-in and flatten it.
     samples = sampler.get_chain()
     flat_samples = sampler.get_chain(discard=discard, flat=True)
+
+    # Close up the pool, if it was made.
+    if inpt_dict["max_cores"] != 1:
+        pool.close()
+        pool.join()
 
     # Get how many parameters were fit and what each one is called.
     n = np.shape(samples[:,:,0])[0]*np.shape(samples[:,:,0])[1]
