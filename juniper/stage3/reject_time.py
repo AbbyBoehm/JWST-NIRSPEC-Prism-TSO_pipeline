@@ -39,8 +39,8 @@ def iterate_fixed(segments, inpt_dict):
     # Start iterating.
     for sigma in inpt_dict["fixed_sigmas"]:
         # Compute median image and std deviation.
-        med = np.median(segments.data, axis=0)
-        std = np.std(segments.data, axis=0)
+        med = np.ma.median(segments.data, axis=0)
+        std = np.ma.std(segments.data, axis=0)
 
         # Track bad pixels in this sigma.
         bad_pix_this_sigma = 0
@@ -71,6 +71,10 @@ def iterate_fixed(segments, inpt_dict):
                     correction = np.median(segments.data.values[l:r,:,:],axis=0)
                 # And replace with correction.
                 segments.data.values[k,:,:] = np.where(S == 1, correction, segments.data.values[k,:,:])
+            # Otherwise, just mask the bad pixels.
+            else:
+                segments.data.values[k,:,:] = np.ma.masked_array(segments.data.values[k,:,:],
+                                                                 mask=bad_pix_map[k,:,:])
             
         # Report how many bad pixels this sigma trimmed.
         if inpt_dict["verbose"] == 2:

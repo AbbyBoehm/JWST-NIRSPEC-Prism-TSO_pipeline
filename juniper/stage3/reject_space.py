@@ -58,7 +58,11 @@ def smooth(segments, inpt_dict):
         # And replace if asked.
         if inpt_dict["space_replace"]:
             segments.data.values[k,:,:] = np.where(S == 1, smooth, segments.data.values[k,:,:])
-    
+        # Otherwise, just mask the bad pixels.
+        else:
+            segments.data.values[k,:,:] = np.ma.masked_array(segments.data.values[k,:,:],
+                                                                mask=bad_pix_map[k,:,:])
+            
     # Update data flags.
     segments.dq.values = np.where(bad_pix_map != 0, 1, segments.dq.values)
 
@@ -207,6 +211,10 @@ def led(segments, inpt_dict):
             if inpt_dict["led_replace"]:
                 med_filter_image = median_filter(integration,size=5)
                 integration = np.where(S != 0, med_filter_image, integration)
+            # Otherwise, just mask the bad pixels.
+            else:
+                integration = np.ma.masked_array(integration,
+                                                 mask=bad_pix_map[k,:,:])
 
             # Make some plots if asked.
             if (plot_step or save_step) and k == 0:

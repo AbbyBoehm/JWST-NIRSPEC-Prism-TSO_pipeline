@@ -92,9 +92,12 @@ def mask_flags(segments, inpt_dict):
         # And replace.
         segments.data.values = np.where(dq_mask > 0, replacement, segments.data.values)
 
+    # Otherwise, just mask the bad pixels.
     else:
-        # No replacement. We ran this step purely to log JWST flags as 1s and 0s, and exclude flags of our choosing.
-        pass
+        if inpt_dict["verbose"] == 2:
+            print("Masking flagged pixels with np.ma.masked_array...")
+        mask = np.where(dq_mask > 0, 1, 0)
+        segments.data.values = np.ma.masked_array(segments.data.values,mask=mask)
 
     # In the future, having JWST flag information stored in 1s or 0s rather than even integers will be helpful.
     if inpt_dict["verbose"] == 2:
