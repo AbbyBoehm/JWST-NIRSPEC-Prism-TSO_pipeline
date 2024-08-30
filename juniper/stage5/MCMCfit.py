@@ -112,6 +112,7 @@ def mcmcfit_one(lc_time, light_curve, errors, waves, planets, flares, systematic
     if inpt_dict["max_cores"] != 1:
         # Count cores that are available.
         cores = cpu_count()
+        print("Found {} total cores available.".format(cores))
         if inpt_dict["max_cores"] in ('quarter','half','all'):
             # Asked for a fraction of what's available, so get that fraction.
             translate = {'quarter':0.25,'half':0.5,'all':1.0}
@@ -122,6 +123,7 @@ def mcmcfit_one(lc_time, light_curve, errors, waves, planets, flares, systematic
         if n_use > cores:
             # Don't use more cores than there are!
             n_use = cores
+        print("Multiprocessing with {} cores.".format(n_use))
         pool = Pool(n_use)
     else:
         pool = None
