@@ -1,4 +1,5 @@
-__all__ = ['plot_fit_and_res',
+__all__ = ['do_stage6',
+           'plot_fit_and_res',
            'plot_model_panel',
            'plot_spectrum',
            'compute_depths',]

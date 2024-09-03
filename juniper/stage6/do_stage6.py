@@ -51,23 +51,25 @@ def do_stage6(filepaths, outfile, outdir, steps, plot_dir):
     if steps["read_LSQ"]:
         # Load each lsq result.
         for f in [filepath for filepath in filepaths if "LSQ" in filepath]:
-            result = np.load(f,allow_pickle=True)
+            result = np.load(f,allow_pickle=True).item()
             key = str.split(f,sep='/')[-1]
-            key = str.replace(f,'.npy','')
+            key = str.replace(key,'.npy','')
             results[key] = result
 
     if steps["read_MCMC"]:
         # Load each mcmc result.
         for f in [filepath for filepath in filepaths if "MCMC" in filepath]:
-            result = np.load(f,allow_pickle=True)
+            result = np.load(f,allow_pickle=True).item()
             key = str.split(f,sep='/')[-1]
-            key = str.replace(f,'.npy','')
+            key = str.replace(key,'.npy','')
             results[key] = result
     
     # With the fits loaded, we can start making plots. We start with fits and residuals.
     if steps["plot_individual"]:
         # We want to plot each light curve in its own plot.
-        for key in list(results.keys()):
+        for key in tqdm(list(results.keys()),
+                        desc='Processing fit-res for each fit...',
+                        disable=(not time_ints)):
             tag = 'MCMC'
             if 'LSQ' in key:
                 tag = 'LSQ'
@@ -75,8 +77,17 @@ def do_stage6(filepaths, outfile, outdir, steps, plot_dir):
             # flares, flare_errs, systematics, systematic_errs,
             # LD, LD_err, time, light_curve, errors, wavelength.
             result = results[key]
+
+            if 'broadband' in key:
+                time = result['time'][0]
+                light_curve = result['light_curve'][0]
+                errors = result['errors'][0]
+            else:
+                time = result['time']
+                light_curve = result['light_curve']
+                errors = result['errors']
             
-            fig, ax = plot_fit_and_res.plot_fit_and_res(result['time'],result['light_curve'],result['errors'],
+            fig, ax = plot_fit_and_res.plot_fit_and_res(time, light_curve, errors,
                                                         result['planets'],result['flares'],
                                                         result['systematics'],result['LD'],steps)
             
@@ -95,7 +106,9 @@ def do_stage6(filepaths, outfile, outdir, steps, plot_dir):
     # We can plot panels of the models, too.
     if steps["plot_components"]:
         # We want to plot each light curve's components in panels.
-        for key in list(results.keys()):
+        for key in tqdm(list(results.keys()),
+                        desc='Processing model components for each fit...',
+                        disable=(not time_ints)):
             tag = 'MCMC'
             if 'LSQ' in key:
                 tag = 'LSQ'
@@ -104,7 +117,16 @@ def do_stage6(filepaths, outfile, outdir, steps, plot_dir):
             # LD, LD_err, time, light_curve, errors, wavelength.
             result = results[key]
 
-            fig, axes = plot_model_panel.plot_model_panel(result['time'],result['light_curve'],result['errors'],
+            if 'broadband' in key:
+                time = result['time'][0]
+                light_curve = result['light_curve'][0]
+                errors = result['errors'][0]
+            else:
+                time = result['time']
+                light_curve = result['light_curve']
+                errors = result['errors']
+
+            fig, axes = plot_model_panel.plot_model_panel(time, light_curve, errors,
                                                           result['planets'],result['flares'],
                                                           result['systematics'],result['LD'],steps)
             
@@ -127,16 +149,18 @@ def do_stage6(filepaths, outfile, outdir, steps, plot_dir):
 
             wavelengths, ts, lcs, lc_errs = [], [], [], []
             t_interps, lc_interps, residualses = [], [], []
-            for key in result_keys:
+            for key in tqdm(list(results.keys()),
+                            desc='Processing fit-res for waterfall plot...',
+                            disable=(not time_ints)):
                 result = results[key]
                 if result['wavelength'] != 'broadband':
                     wavelengths.append(result['wavelength'])
                     ts.append(result['time'])
                     lcs.append(result['light_curve'])
                     lc_errs.append(result['errors'])
-                    t_interp, lc_interp, comps, residuals = plot_fit_and_res.get_fit_and_res(result['time'], result['light_curve'], result['errors'],
-                                                                                            result['planets'], result['flares'], result['systematics'], result['LD'],
-                                                                                            steps)
+                    t_interp, lc_interp, comps, residuals = plot_fit_and_res.get_fit_and_res(result['time'],result['light_curve'],result['errors'],
+                                                                                             result['planets'], result['flares'], result['systematics'], result['LD'],
+                                                                                             steps)
                     t_interps.append(t_interp)
                     lc_interps.append(lc_interp)
                     residualses.append(residuals)
@@ -168,18 +192,26 @@ def do_stage6(filepaths, outfile, outdir, steps, plot_dir):
                     for key in result_keys:
                         # Get the result's planets.
                         planets = results[key]['planets']
-                        planet_errs = results[key]['planets_errs']
+                        planet_errs = results[key]['planet_errs']
                         waves.append(results[key]['wavelength'])
 
                         # Get the spectrum for the current planet of interest.
                         if steps["spectrum_type"] == 'rprs':
-                            depth, err = compute_depths.compute_depth_rprs(planets,planet_errs,str(planet_ID))
+                            depth, err = compute_depths.compute_depth_rprs(planets['planet{}'.format(planet_ID)],
+                                                                           planet_errs['planet{}'.format(planet_ID)],
+                                                                           str(planet_ID))
                         if steps["spectrum_type"] == 'rprs2':
-                            depth, err = compute_depths.compute_depth_rprs2(planets,planet_errs,str(planet_ID))
+                            depth, err = compute_depths.compute_depth_rprs2(planets['planet{}'.format(planet_ID)],
+                                                                           planet_errs['planet{}'.format(planet_ID)],
+                                                                           str(planet_ID))
                         if steps["spectrum_type"] == 'aover':
-                            depth, err = compute_depths.compute_depth_aoverlap(planets,planet_errs,str(planet_ID))
+                            depth, err = compute_depths.compute_depth_aoverlap(planets['planet{}'.format(planet_ID)],
+                                                                           planet_errs['planet{}'.format(planet_ID)],
+                                                                           str(planet_ID))
                         if steps["spectrum_type"] == 'fpfs':
-                            depth, err = compute_depths.compute_depth_fpfs(planets,planet_errs,str(planet_ID))
+                            depth, err = compute_depths.compute_depth_fpfs(planets['planet{}'.format(planet_ID)],
+                                                                           planet_errs['planet{}'.format(planet_ID)],
+                                                                           str(planet_ID))
 
                         depths.append(depth)
                         errors.append(err)

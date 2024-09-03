@@ -29,6 +29,11 @@ def plot_model_panel(t, lc, lc_err, planets, flares, systematics, LD, inpt_dict)
     Returns:
         fig, axes: matplotlib plot with the model pieces on it.
     """
+    # Array-ify as needed.
+    t = np.asarray(t)
+    lc = np.asarray(lc)
+    lc_err = np.asarray(lc_err)
+    
     # Get the model components and how many there are.
     t_interp, lc_interp, components, residuals = get_fit_and_res(t, lc, lc_err, planets, flares, systematics, LD, inpt_dict)
     N_comps = len(list(components.keys()))
@@ -47,7 +52,7 @@ def plot_model_panel(t, lc, lc_err, planets, flares, systematics, LD, inpt_dict)
     total = ['a' for i in template]
     mosaic = [total,total,] # first two rows are for the total model.
     keys = []
-    for n in n_rows:
+    for n in range(n_rows):
         mosaic.append([str(n)+i for i in template])
         for key in mosaic[-1]:
             keys.append(key)
@@ -55,18 +60,18 @@ def plot_model_panel(t, lc, lc_err, planets, flares, systematics, LD, inpt_dict)
     # We'll plot a total model on top and panels for each component on the sides.
     fig, axes = plt.subplot_mosaic(mosaic=mosaic, figsize=(10,10))
 
-    axes['a'].errorbar(t,lc,yerr=lc_err,fmt='ko',ls='none',capsize=3,label='light curve')
-    axes['a'].plot(t_interp, lc_interp, color='red',label='full model')
+    axes['a'].errorbar(t,lc,yerr=lc_err,fmt='ko',ls='none',capsize=3,label='light curve',zorder=0)
+    axes['a'].plot(t_interp, lc_interp, color='red',label='full model',zorder=2)
     axes['a'].legend(loc='upper right')
     
-    if inpt_dict["plot_bin"]:
-        bin_t = time_bin(t,bin_size=inpt_dict["plot_bin"],mode='median')
-        bin_lc = time_bin(lc,bin_size=inpt_dict["plot_bin"],mode='median')
-        axes['a'].scatter(t,lc,color='blue',alpha=0.5)
+    if inpt_dict["comps_bin"]:
+        bin_t = time_bin(t,bin_size=inpt_dict["comps_bin"],mode='median')
+        bin_lc = time_bin(lc,bin_size=inpt_dict["comps_bin"],mode='median')
+        axes['a'].scatter(bin_t,bin_lc,color='blue',alpha=0.5,zorder=1)
     
     for component, key in zip(list(components.keys()),keys):
         axes[key].plot(t_interp,components[component],color='darkblue')
-        axes[key].title(component)
+        axes[key].set_title(component)
 
     return fig, axes
     

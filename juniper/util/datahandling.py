@@ -476,10 +476,10 @@ def save_s5_output(planets, planets_err, flares, flares_err,
               "systematic_errs":systematics_err,
               "LD":LD,
               "LD_err":LD_err,
-              "time":time,
-              "light_curve":light_curve,
-              "errors":errors,
-              "wavelength":wavelength}
+              "time":np.asarray(time),
+              "light_curve":np.asarray(light_curve),
+              "errors":np.asarray(errors),
+              "wavelength":np.asarray(wavelength)}
     
     filename = (os.path.join(outdir, '{}.npy'.format(outfile)))
     np.save(filename,output)

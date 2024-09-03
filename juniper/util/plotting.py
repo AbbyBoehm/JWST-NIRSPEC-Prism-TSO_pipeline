@@ -41,12 +41,12 @@ def plot_fit(ax, t, lc, lc_err, t_interp, lc_interp):
         t_interp (_type_): _description_
         lc_interp (_type_): _description_
     """
-    if lc_err:
-        ax.errorbar(t, lc, yerr=lc_err, fmt='ko')
+    if lc_err.size != 0:
+        ax.errorbar(t, lc, yerr=lc_err, fmt='ko', capsize=3, zorder=0)
     else:
-        ax.scatter(t, lc, color='k')
+        ax.scatter(t, lc, color='k', zorder=0)
     
-    ax.plot(t_interp, lc_interp, color='red')
+    ax.plot(t_interp, lc_interp, color='red', zorder=2)
     return ax
 
 def plot_res(ax, t, res, lc_err):
@@ -58,12 +58,12 @@ def plot_res(ax, t, res, lc_err):
         res (_type_): _description_
         lc_err (_type_): _description_
     """
-    if lc_err:
-        ax.errorbar(t, res, yerr=lc_err, fmt='ko')
+    if lc_err.size != 0:
+        ax.errorbar(t, res, yerr=lc_err, fmt='ko', capsize=3, zorder=0)
     else:
-        ax.scatter(t, res, color='k')
+        ax.scatter(t, res, color='k', zorder=0)
 
-    ax.axhline(y=0,color='red',ls='--')
+    ax.axhline(y=0,color='red',ls='--', zorder=2)
     return ax
 
 def plot_corner(flat_samples, labels):

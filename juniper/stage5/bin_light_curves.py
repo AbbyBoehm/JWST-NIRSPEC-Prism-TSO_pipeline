@@ -124,6 +124,17 @@ def bin_light_curves(spectra, inpt_dict):
         broadwave_det = np.ma.median(waves)
         # The wavelength bounds is also straightforward.
         broadbins_det = np.array([np.ma.min(waves),np.ma.max(waves)])
+        # If asked, replace outliers from the curve.
+        if inpt_dict["clip_outliers"]:
+            ksize = int(0.01*len(broadband_det))
+            if ksize % 2 == 0:
+                # Make it odd.
+                ksize -= 1
+            if ksize == 0:
+                # If your light curve is that small, you should not be sigma clipping.
+                continue
+            smoothed = signal.medfilt(broadband_det,kernel_size=ksize)
+            broadband_det = np.where(np.abs(broadband_det - smoothed) > inpt_dict["clip_outliers"]*np.ma.std(broadband_det),smoothed,broadband_det)
         # Store both the spectrum and each point's uncertainty.
         broadband.append(broadband_det)
         broaderr.append(broaderr_det)
@@ -171,6 +182,18 @@ def bin_light_curves(spectra, inpt_dict):
                         last_wave = specwave_det[-1]
                         hw = (bin_wave-last_wave)/2
                         bin_bins=np.array([bin_wave-hw,bin_wave+hw])
+
+                # If asked, replace outliers from the curve.
+                if inpt_dict["clip_outliers"]:
+                    ksize = int(0.01*len(bin_spec))
+                    if ksize % 2 == 0:
+                        # Make it odd.
+                        ksize -= 1
+                    if ksize == 0:
+                        # If your light curve is that small, you should not be sigma clipping.
+                        continue
+                    smoothed = signal.medfilt(bin_spec,kernel_size=ksize)
+                    bin_spec = np.where(np.abs(bin_spec - smoothed) > inpt_dict["clip_outliers"]*np.ma.std(bin_spec),smoothed,bin_spec)
         
                 # Store both the spectrum and each point's uncertainty.
                 spec_det.append(bin_spec)
@@ -206,6 +229,18 @@ def bin_light_curves(spectra, inpt_dict):
                 last_wave = specwave_det[-1]
                 hw = (bin_wave-last_wave)/2
                 bin_bins=np.array([bin_wave-hw,bin_wave+hw])
+
+            # If asked, replace outliers from the curve.
+            if inpt_dict["clip_outliers"]:
+                ksize = int(0.01*len(bin_spec))
+                if ksize % 2 == 0:
+                    # Make it odd.
+                    ksize -= 1
+                if ksize == 0:
+                    # If your light curve is that small, you should not be sigma clipping.
+                    continue
+                smoothed = signal.medfilt(bin_spec,kernel_size=ksize)
+                bin_spec = np.where(np.abs(bin_spec - smoothed) > inpt_dict["clip_outliers"]*np.ma.std(bin_spec),smoothed,bin_spec)
     
             # Store both the spectrum and each point's uncertainty.
             spec_det.append(bin_spec)
@@ -255,6 +290,18 @@ def bin_light_curves(spectra, inpt_dict):
                         last_wave = specwave_det[-1]
                         hw = (bin_wave-last_wave)/2
                         bin_bins=np.array([bin_wave-hw,bin_wave+hw])
+
+                # If asked, replace outliers from the curve.
+                if inpt_dict["clip_outliers"]:
+                    ksize = int(0.01*len(bin_spec))
+                    if ksize % 2 == 0:
+                        # Make it odd.
+                        ksize -= 1
+                    if ksize == 0:
+                        # If your light curve is that small, you should not be sigma clipping.
+                        continue
+                    smoothed = signal.medfilt(bin_spec,kernel_size=ksize)
+                    bin_spec = np.where(np.abs(bin_spec - smoothed) > inpt_dict["clip_outliers"]*np.ma.std(bin_spec),smoothed,bin_spec)
         
                 # Store both the spectrum and each point's uncertainty.
                 spec_det.append(bin_spec)

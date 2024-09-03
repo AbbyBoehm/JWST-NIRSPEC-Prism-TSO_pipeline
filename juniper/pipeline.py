@@ -10,7 +10,7 @@ from juniper.stage2 import *
 from juniper.stage3 import *
 from juniper.stage4 import *
 from juniper.stage5 import *
-#from juniper.stage6 import *
+from juniper.stage6 import *
 
 
 def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
@@ -242,3 +242,44 @@ def run_pipeline(config_folder,stages=(1,2,3,4,5,6,)):
         if run_name:
             config_name = "s5_{}_juniper.berry".format(run_name)
         shutil.copy(s5_config_path,os.path.join(config_outdir,config_name))
+    ### Run Juniper Stage 6: Results
+    if 6 in stages:
+        # Open the config dictionary.
+        s6_config_path = glob.glob(os.path.join(config_folder,'s6_*'))[0]
+        s6_config = read_config.read_config(s6_config_path)
+
+        # Set up run name and define directories.
+        run_name = s6_config["run_name"] # set up run_name for the .berry file
+        project_dir = s6_config["toplevel_dir"]
+        input_dir = os.path.join(project_dir,s6_config["input"])
+        output_dir = os.path.join(project_dir,s6_config["output"])
+        if run_name:
+            # Add an extra sub-folder to separate this run from other runs.
+            output_dir = os.path.join(project_dir,os.path.join(s6_config["output"],run_name))
+        diagnosticplots_dir = os.path.join(output_dir, s6_config["diagnostics"])
+
+        # Open all needed directories.
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        if not os.path.exists(diagnosticplots_dir):
+            os.makedirs(diagnosticplots_dir)
+
+        # Find files.
+        files = sorted(glob.glob(os.path.join(input_dir,"*.npy")))
+        fnames = [str.split(f,sep='/')[-1] for f in files]
+        outfile = [str.split(f,sep='_')[0]+'_results' for f in fnames][0] # use default name. There's only one file to be output here.
+        if s6_config["rename"]:
+            # Set up new outfile name.
+            outfile = '{}_results'.format(s6_config["rename"])
+
+        # Process Stage 6.
+        do_stage6(files,outfile,output_dir,s6_config,diagnosticplots_dir)
+
+        # Write the config dictionary out as a copy.
+        config_outdir = os.path.join(output_dir,"configuration")
+        if not os.path.exists(config_outdir):
+            os.makedirs(config_outdir)
+        config_name = "s6_juniper.berry"
+        if run_name:
+            config_name = "s6_{}_juniper.berry".format(run_name)
+        shutil.copy(s6_config_path,os.path.join(config_outdir,config_name))
