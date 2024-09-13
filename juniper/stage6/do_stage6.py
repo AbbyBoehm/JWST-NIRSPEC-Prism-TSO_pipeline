@@ -78,30 +78,33 @@ def do_stage6(filepaths, outfile, outdir, steps, plot_dir):
             # LD, LD_err, time, light_curve, errors, wavelength.
             result = results[key]
 
-            if 'broadband' in key:
-                time = result['time'][0]
-                light_curve = result['light_curve'][0]
-                errors = result['errors'][0]
-            else:
-                time = result['time']
-                light_curve = result['light_curve']
-                errors = result['errors']
-            
-            fig, ax = plot_fit_and_res.plot_fit_and_res(time, light_curve, errors,
-                                                        result['planets'],result['flares'],
-                                                        result['systematics'],result['LD'],steps)
-            
-            if (result['wavelength'] == 'broadband' and save_step):
-                plt.savefig(os.path.join(plot_dir,'s5_{}_broadband_fit-res{}.png'.format(outfile,tag)),
-                            dpi=300,bbox_inches='tight')
-            elif save_ints:
-                plt.savefig(os.path.join(plot_dir,'s5_{}_{}_fit-res{}.png'.format(outfile,result['wavelength'],tag)),
-                            dpi=300,bbox_inches='tight')
-            if (result['wavelength'] == 'broadband' and plot_step):
-                plt.show(block=True)
-            elif plot_ints:
-                plt.show(block=True)
-            plt.close()
+            try:
+                if 'broadband' in key:
+                    time = result['time'][0]
+                    light_curve = result['light_curve'][0]
+                    errors = result['errors'][0]
+                else:
+                    time = result['time']
+                    light_curve = result['light_curve']
+                    errors = result['errors']
+                
+                fig, ax = plot_fit_and_res.plot_fit_and_res(time, light_curve, errors,
+                                                            result['planets'],result['flares'],
+                                                            result['systematics'],result['LD'],steps)
+                
+                if (result['wavelength'] == 'broadband' and save_step):
+                    plt.savefig(os.path.join(plot_dir,'s5_{}_broadband_fit-res{}.png'.format(outfile,tag)),
+                                dpi=300,bbox_inches='tight')
+                elif save_ints:
+                    plt.savefig(os.path.join(plot_dir,'s5_{}_{}_fit-res{}.png'.format(outfile,result['wavelength'],tag)),
+                                dpi=300,bbox_inches='tight')
+                if (result['wavelength'] == 'broadband' and plot_step):
+                    plt.show(block=True)
+                elif plot_ints:
+                    plt.show(block=True)
+                plt.close()
+            except KeyError:
+                print("Fault with result {}, passing...".format(key))
 
     # We can plot panels of the models, too.
     if steps["plot_components"]:
@@ -189,11 +192,11 @@ def do_stage6(filepaths, outfile, outdir, steps, plot_dir):
                     waves = []
                     depths = []
                     errors = []
-                    for key in result_keys:
+                    for key in [key for key in result_keys if results[key]['wavelength'] != 'broadband']:
                         # Get the result's planets.
                         planets = results[key]['planets']
                         planet_errs = results[key]['planet_errs']
-                        waves.append(results[key]['wavelength'])
+                        waves.append(float(results[key]['wavelength']))
 
                         # Get the spectrum for the current planet of interest.
                         if steps["spectrum_type"] == 'rprs':
@@ -222,6 +225,8 @@ def do_stage6(filepaths, outfile, outdir, steps, plot_dir):
                         wave_bounds = steps["wave_bounds"]
                         if not steps["bin_factors"]:
                             bin_factors = [1,]
+                        if 1 not in bin_factors:
+                            bin_factors.append(1) # ensure there is always native res
                         for bin_f in bin_factors:
                             fig, ax = plot_spectrum.plot_spectrum(waves,depths,errors,
                                                                 bin_f,wave_bounds,steps["spectrum_type"])
