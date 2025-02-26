@@ -4,13 +4,14 @@
 toplevel_dir    ''                                          # Top-level directory for all files in this project. The input and output files should be here.
 input           'uncal'                                     # The sub-directory relative to the top-level directory where your input *uncal.fits files are.
 output          'rates'                                     # The sub-directory relative to the top-level directory where your output *rateints.fits files will be saved.
-run_name        None                                        # str or None. You can use this to open sub-folders in the output folder if you wanted to rerun (e.g. have output/run1 and output/run2).
+input_run       None                                        # str or None. You can use this to choose a sub-folder from the input folder if you wanted to rerun (e.g. pull from input/nrs1 instead of input/ or input/nrs2).
+output_run      None                                        # str or None. You can use this to open sub-folders in the output folder if you wanted to rerun (e.g. have output/run1 and output/run2).
 CRDS_PATH       None                                        # str or None. If you already have a crds_cache directory, point to its absolute path here. Otherwise, a crds_cache will be opened in the current working directory.
 max_cores       'half'                                      # integer or 'quarter', 'half', 'all'. How many cores to use for multiprocessing.
 verbose         2                                           # Int from 0 to 2. 0 = print nothing. 1 = print some statements. 2 = print every action.
 show_plots      2                                           # Int from 0 to 2. 0 = show nothing. 1 = show some plots. 2 = show all plots.
 save_plots      2                                           # Int from 0 to 2. 0 = save nothing. 1 = save some plots. 2 = save all plots.
-diagnostics     'diagnostics'                         # str. If save_plots >= 1, diagnostic plots will be written to this folder relative to output (and run_name, if applicable).
+diagnostics     'rates/diagnostics'                         # str. If save_plots >= 1, diagnostic plots will be written to this folder relative to output (and run_name, if applicable).
 
 # Step 1: JWST Detector1Pipeline
 rename          'name'                                      # str. What you want to rename the files to. Can be None to keep the default name. Suggestions include naming the files after the target planet and program ID (e.g. 'PLANET-B_ID12345').

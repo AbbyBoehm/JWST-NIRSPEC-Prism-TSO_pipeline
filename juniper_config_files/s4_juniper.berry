@@ -4,7 +4,8 @@
 toplevel_dir    ''                                          # Top-level directory for all files in this project. The input and output files should be here.
 input           'reduced'                                   # The sub-directory relative to the top-level directory where your input *reduced.nc files are.
 output          'extracted'                                 # The sub-directory relative to the top-level directory where your output *1Dspec.nc files will be saved.
-run_name        None                                        # str or None. You can use this to open sub-folders in the output folder if you wanted to rerun (e.g. have output/run1 and output/run2).
+input_run       None                                        # str or None. You can use this to choose a sub-folder from the input folder if you wanted to rerun (e.g. pull from input/run1 instead of input/ or input/run2).
+output_run      None                                        # str or None. You can use this to open sub-folders in the output folder if you wanted to rerun (e.g. have output/run1 and output/run2).
 CRDS_PATH       None                                        # str or None. If you already have a crds_cache directory, point to its absolute path here. Otherwise, a crds_cache will be opened in the current working directory.
 max_cores       'half'                                      # integer or 'quarter', 'half', 'all'. How many cores to use for multiprocessing.
 verbose         2                                           # Int from 0 to 2. 0 = print nothing. 1 = print some statements. 2 = print every action.
